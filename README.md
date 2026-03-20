@@ -1,6 +1,5 @@
 # 🕷️ Araria
-
-**Interactive spider animation with procedural horror audio.**
+### Interactive spider animation with procedural horror audio.
 
 Arañas generativas que siguen tu cursor, con sonido procedural en tiempo real — cada clic de pata, cada eco de caverna, generado por Web Audio API. Sin samples, sin dependencias, puro vanilla.
 
