@@ -148,48 +148,63 @@ const AudioEngine = (() => {
     if (vol < 0.01) return;
     const now = audioCtx.currentTime;
 
+    // 1. IMPACT (Thud) — Low frequency click
+    const thud = audioCtx.createOscillator();
+    thud.type = "triangle";
+    thud.frequency.setValueAtTime(150 + pitch * 10, now);
+    thud.frequency.exponentialRampToValueAtTime(40, now + 0.03);
+
+    const thudEnv = audioCtx.createGain();
+    thudEnv.gain.setValueAtTime(0, now);
+    thudEnv.gain.linearRampToValueAtTime(vol * 0.35, now + 0.002);
+    thudEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+    // 2. SQUELCH (Sticky sound) — Filtered Noise burst
     const src = audioCtx.createBufferSource();
     src.buffer = noiseBuffer;
 
-    // Vertical pitch modulation (Top = higher, Bottom = lower)
-    const yFactor = 1 - (screenY / innerHeight); // 0 at bottom, 1 at top
-    const pitchOffset = yFactor * 1500; // Adds up to 1500Hz at the top
+    const yFactor = 1 - (screenY / innerHeight);
+    const pOffset = yFactor * 800; // Lower pitch offset globally
 
-    // Bandpass for crispy click character
-    const bp = audioCtx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 1600 + pitch * 300 + pitchOffset + Math.random() * 500;
-    bp.Q.value = 4 + Math.random() * 6;
+    // Resonant Lowpass per "sticky" feel
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 800 + pitch * 200 + pOffset;
+    lp.Q.value = 12 + Math.random() * 8; // High resonance for squelch
 
-    // Resonant peak — "chitin on stone"
+    // Secondary "snap" — Peaking filter
     const pk = audioCtx.createBiquadFilter();
     pk.type = "peaking";
-    pk.frequency.value = 3000 + Math.random() * 2000;
-    pk.gain.value = 10;
-    pk.Q.value = 2.5;
+    pk.frequency.value = 2500 + pOffset;
+    pk.gain.value = -15; // Cut highs to remove plastic feel
 
-    // Ultra-short envelope
     const env = audioCtx.createGain();
-    const decay = 0.01 + Math.random() * 0.02; // Slightly longer decay
+    const decay = 0.015 + Math.random() * 0.025;
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(vol * 0.4, now + 0.0015); // Much higher peak (0.4)
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.002 + decay);
+    env.gain.linearRampToValueAtTime(vol * 0.25, now + 0.005); // Slower attack for "stick"
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.01 + decay);
 
     // Pan
     const pan = audioCtx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, (screenX / innerWidth) * 2 - 1));
 
-    src.connect(bp);
-    bp.connect(pk);
+    // Connect IMPACT
+    thud.connect(thudEnv);
+    thudEnv.connect(pan);
+
+    // Connect SQUELCH
+    src.connect(lp);
+    lp.connect(pk);
     pk.connect(env);
     env.connect(pan);
-    pan.connect(dryGain);
-    pan.connect(delayNode);
-    pan.connect(convolver);
 
-    const total = decay + 0.025;
+    pan.connect(clipper);
+
+    const total = 0.06;
+    thud.start(now);
+    thud.stop(now + total);
     src.start(now, Math.random() * 0.8, total);
-    src.stop(now + total + 0.005);
+    src.stop(now + total);
   }
 
   // ═══ Ambiente control ═══
