@@ -39,6 +39,9 @@ document.getElementById("droneVol").addEventListener("input", (e) => {
 document.getElementById("ambiente").addEventListener("input", (e) => {
   AudioEngine.setAmbiente(parseInt(e.target.value, 10));
 });
+document.getElementById("spiderTexture").addEventListener("input", (e) => {
+  AudioEngine.setSpiderTexture(parseInt(e.target.value, 10));
+});
 
 document.getElementById("audioToggle").addEventListener("click", async () => {
   const btn = document.getElementById("audioToggle");

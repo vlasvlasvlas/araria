@@ -147,16 +147,18 @@ const AudioEngine = (() => {
     const vol = insectVol / 100;
     if (vol < 0.01) return;
     const now = audioCtx.currentTime;
+    const tex = spiderTexture / 100; // 0-1
 
-    // 1. IMPACT (Subtle Thud)
+    // 1. IMPACT (Subtle Thud) — More present when tex is low
     const thud = audioCtx.createOscillator();
-    thud.type = "sine"; // Sine is cleaner than triangle for this
-    thud.frequency.setValueAtTime(120 + pitch * 10, now);
+    thud.type = "sine";
+    thud.frequency.setValueAtTime(100 + pitch * 10, now);
     thud.frequency.exponentialRampToValueAtTime(30, now + 0.04);
 
     const thudEnv = audioCtx.createGain();
     thudEnv.gain.setValueAtTime(0, now);
-    thudEnv.gain.linearRampToValueAtTime(vol * 0.15, now + 0.002); // Lowered impact
+    // Impact gain: higher at tex=0
+    thudEnv.gain.linearRampToValueAtTime(vol * (0.4 * (1 - tex)), now + 0.002);
     thudEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
     // 2. STICKY SNAP (Intermediate)
@@ -166,43 +168,46 @@ const AudioEngine = (() => {
     const yFactor = 1 - (screenY / innerHeight);
     const pOffset = yFactor * 1000;
 
-    // Bandpass + Peaking for a mix of "snap" and "squelch"
+    // Filter Interpolation:
+    // Low tex -> Low Freq, High Q (Sopapa)
+    // High tex -> High Freq, Low Q (Latoso)
     const bp = audioCtx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 1200 + pitch * 300 + pOffset;
-    bp.Q.value = 3; // Wider than before for less "honk"
+    bp.frequency.value = (800 + pitch * 200 + pOffset) * (1 - tex) + (2200 + pitch * 400 + pOffset) * tex;
+    bp.Q.value = 10 * (1 - tex) + 2 * tex;
 
     const pk = audioCtx.createBiquadFilter();
     pk.type = "peaking";
-    pk.frequency.value = 3500 + pOffset;
-    pk.gain.value = 8; // Bring back some high-end "chitin" snap
-    pk.Q.value = 2;
+    pk.frequency.value = 4000 + pOffset;
+    // Peaking gain: negative at tex=0 (disgusting), positive at tex=1 (latoso)
+    pk.gain.value = -20 * (1 - tex) + 15 * tex;
+    pk.Q.value = 1.5;
 
     const env = audioCtx.createGain();
-    const decay = 0.008 + Math.random() * 0.015;
+    // Decay: longer at tex=0
+    const decay = (0.02 * (1 - tex)) + (0.006 * tex) + Math.random() * 0.01;
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(vol * 0.3, now + 0.002); // Faster attack than "sticky"
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.005 + decay);
+    // Attack: slower at tex=0
+    const attack = 0.005 * (1 - tex) + 0.001 * tex;
+    env.gain.linearRampToValueAtTime(vol * 0.3, now + attack);
+    env.gain.exponentialRampToValueAtTime(0.001, now + attack + decay);
 
     // Pan
     const pan = audioCtx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, (screenX / innerWidth) * 2 - 1));
 
-    // Connect IMPACT
     thud.connect(thudEnv);
     thudEnv.connect(pan);
-
-    // Connect STICKY SNAP
     src.connect(bp);
     bp.connect(pk);
     pk.connect(env);
     env.connect(pan);
 
-    pan.connect(clipper); // Master output through clipper
+    pan.connect(clipper);
     pan.connect(delayNode);
     pan.connect(convolver);
 
-    const total = 0.06;
+    const total = 0.08;
     thud.start(now);
     thud.stop(now + total);
     src.start(now, Math.random() * 0.8, total);
@@ -240,6 +245,7 @@ const AudioEngine = (() => {
   function setInsectVol(v) { insectVol = v; }
   function setDroneVol(v) { droneVol = v; }
   function setAmbiente(v) { ambienteLevel = v; applyAmbiente(); }
+  function setSpiderTexture(v) { spiderTexture = v; }
 
   async function toggle() {
     if (!audioCtx) init();
@@ -256,5 +262,5 @@ const AudioEngine = (() => {
     return audioCtx && audioCtx.state === "running";
   }
 
-  return { toggle, isPlaying, tick, legClick, setInsectVol, setDroneVol, setAmbiente };
+  return { toggle, isPlaying, tick, legClick, setInsectVol, setDroneVol, setAmbiente, setSpiderTexture };
 })();
