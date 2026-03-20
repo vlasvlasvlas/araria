@@ -148,41 +148,41 @@ const AudioEngine = (() => {
     if (vol < 0.01) return;
     const now = audioCtx.currentTime;
 
-    // 1. IMPACT (Thud) — Low frequency click
+    // 1. IMPACT (Subtle Thud)
     const thud = audioCtx.createOscillator();
-    thud.type = "triangle";
-    thud.frequency.setValueAtTime(150 + pitch * 10, now);
-    thud.frequency.exponentialRampToValueAtTime(40, now + 0.03);
+    thud.type = "sine"; // Sine is cleaner than triangle for this
+    thud.frequency.setValueAtTime(120 + pitch * 10, now);
+    thud.frequency.exponentialRampToValueAtTime(30, now + 0.04);
 
     const thudEnv = audioCtx.createGain();
     thudEnv.gain.setValueAtTime(0, now);
-    thudEnv.gain.linearRampToValueAtTime(vol * 0.35, now + 0.002);
-    thudEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    thudEnv.gain.linearRampToValueAtTime(vol * 0.15, now + 0.002); // Lowered impact
+    thudEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
-    // 2. SQUELCH (Sticky sound) — Filtered Noise burst
+    // 2. STICKY SNAP (Intermediate)
     const src = audioCtx.createBufferSource();
     src.buffer = noiseBuffer;
 
     const yFactor = 1 - (screenY / innerHeight);
-    const pOffset = yFactor * 800; // Lower pitch offset globally
+    const pOffset = yFactor * 1000;
 
-    // Resonant Lowpass per "sticky" feel
-    const lp = audioCtx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 800 + pitch * 200 + pOffset;
-    lp.Q.value = 12 + Math.random() * 8; // High resonance for squelch
+    // Bandpass + Peaking for a mix of "snap" and "squelch"
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 1200 + pitch * 300 + pOffset;
+    bp.Q.value = 3; // Wider than before for less "honk"
 
-    // Secondary "snap" — Peaking filter
     const pk = audioCtx.createBiquadFilter();
     pk.type = "peaking";
-    pk.frequency.value = 2500 + pOffset;
-    pk.gain.value = -15; // Cut highs to remove plastic feel
+    pk.frequency.value = 3500 + pOffset;
+    pk.gain.value = 8; // Bring back some high-end "chitin" snap
+    pk.Q.value = 2;
 
     const env = audioCtx.createGain();
-    const decay = 0.015 + Math.random() * 0.025;
+    const decay = 0.008 + Math.random() * 0.015;
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(vol * 0.25, now + 0.005); // Slower attack for "stick"
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.01 + decay);
+    env.gain.linearRampToValueAtTime(vol * 0.3, now + 0.002); // Faster attack than "sticky"
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.005 + decay);
 
     // Pan
     const pan = audioCtx.createStereoPanner();
@@ -192,9 +192,9 @@ const AudioEngine = (() => {
     thud.connect(thudEnv);
     thudEnv.connect(pan);
 
-    // Connect SQUELCH
-    src.connect(lp);
-    lp.connect(pk);
+    // Connect STICKY SNAP
+    src.connect(bp);
+    bp.connect(pk);
     pk.connect(env);
     env.connect(pan);
 
