@@ -75,6 +75,10 @@ npx serve .
 - [ ] Audio adaptivo por población
 - [ ] Zoom, paredes, guardar/cargar colonia
 
+## 🎨 Créditos
+
+- Basado originalmente en un script de **codetutor** donde elementos seguían al cursor.
+
 ## 📄 Licencia
 
 MIT
