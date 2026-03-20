@@ -144,11 +144,13 @@ function spawn() {
 setSpiderCount(spiderCount);
 
 // ── Pointer tracking ──
-addEventListener("pointermove", (e) => {
+function move(e) {
   mouseX = e.clientX;
   mouseY = e.clientY;
   spiders.forEach((spider) => spider.follow(e.clientX, e.clientY));
-});
+}
+addEventListener("pointermove", move);
+addEventListener("pointerdown", move);
 
 // ── Animation loop ──
 requestAnimationFrame(function anim(t) {

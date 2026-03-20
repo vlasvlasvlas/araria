@@ -170,3 +170,70 @@ input[type="range"]::-moz-range-thumb {
   background: rgba(255, 255, 255, 0.12);
   margin-right: 4px;
 }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  #controls-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 15px;
+    justify-content: center;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.95) 0%,
+      rgba(0, 0, 0, 0.7) 90%,
+      transparent 100%
+    );
+  }
+  
+  .controls-left, .controls-right {
+    gap: 12px;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .controls-right::before {
+    display: none;
+  }
+
+  .logo {
+    font-size: 1.1rem;
+    margin-right: 0;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  input[type="range"] {
+    width: 60px;
+  }
+
+  .ctrl-icon {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  #controls-bar {
+    padding-top: 5px;
+    gap: 8px;
+  }
+  
+  .controls-left, .controls-right {
+    gap: 10px;
+  }
+  
+  input[type="range"] {
+    width: 45px;
+  }
+  
+  .logo {
+    font-size: 0.95rem;
+  }
+
+  .audio-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+}
