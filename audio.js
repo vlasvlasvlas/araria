@@ -198,7 +198,9 @@ const AudioEngine = (() => {
     pk.connect(env);
     env.connect(pan);
 
-    pan.connect(clipper);
+    pan.connect(clipper); // Master output through clipper
+    pan.connect(delayNode);
+    pan.connect(convolver);
 
     const total = 0.06;
     thud.start(now);
