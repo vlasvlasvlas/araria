@@ -39,14 +39,23 @@ const AudioEngine = (() => {
       }
     }
 
-    // ═══ Output ═══
+    // ═══ Master Processing ═══
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-20, audioCtx.currentTime);
+    compressor.knee.setValueAtTime(40, audioCtx.currentTime);
+    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+    compressor.attack.setValueAtTime(0, audioCtx.currentTime);
+    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.85;
+    
+    compressor.connect(masterGain);
     masterGain.connect(audioCtx.destination);
 
     dryGain = audioCtx.createGain();
     dryGain.gain.value = 0.9;
-    dryGain.connect(masterGain);
+    dryGain.connect(compressor);
 
     // ═══ Delay ═══
     delayNode = audioCtx.createDelay(3.0);
@@ -63,7 +72,7 @@ const AudioEngine = (() => {
     delayFilter.connect(feedbackGain);
     feedbackGain.connect(delayNode);
     feedbackGain.connect(delayWet);
-    delayWet.connect(masterGain);
+    delayWet.connect(compressor);
 
     // ═══ Reverb ═══
     convolver = audioCtx.createConvolver();
@@ -71,7 +80,7 @@ const AudioEngine = (() => {
     reverbGain = audioCtx.createGain();
     reverbGain.gain.value = 0.25;
     convolver.connect(reverbGain);
-    reverbGain.connect(masterGain);
+    reverbGain.connect(compressor);
 
     // ═══ Drone ═══
     // Inner gain (modulated by cave texture) → Outer gain (user volume control)
