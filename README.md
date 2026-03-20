@@ -82,7 +82,3 @@ npx serve .
 ## 📄 Licencia
 
 MIT
-
----
-
-*Araria: ambient horror ASMR generativo. No existe nada así.* 🕷️
