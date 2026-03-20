@@ -133,10 +133,14 @@ const AudioEngine = (() => {
     const src = audioCtx.createBufferSource();
     src.buffer = noiseBuffer;
 
+    // Vertical pitch modulation (Top = higher, Bottom = lower)
+    const yFactor = 1 - (screenY / innerHeight); // 0 at bottom, 1 at top
+    const pitchOffset = yFactor * 1500; // Adds up to 1500Hz at the top
+
     // Bandpass for crispy click character
     const bp = audioCtx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 2200 + pitch * 300 + Math.random() * 500;
+    bp.frequency.value = 1600 + pitch * 300 + pitchOffset + Math.random() * 500;
     bp.Q.value = 4 + Math.random() * 6;
 
     // Resonant peak — "chitin on stone"
