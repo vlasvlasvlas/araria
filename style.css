@@ -29,8 +29,9 @@ body {
   right: 0;
   z-index: 10;
   display: flex;
-  flex-direction: column;
-  padding: 15px 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
   background: linear-gradient(
     180deg,
     rgba(0, 0, 0, 0.9) 0%,
@@ -45,22 +46,20 @@ body {
 .header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  gap: 15px;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 #controls-wrapper {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin-top: 15px;
+  justify-content: flex-end;
+  flex: 1;
+  gap: 20px;
   transition: all 0.3s ease;
 }
 
@@ -94,10 +93,11 @@ body {
   color: #fff;
   font-size: 0.9rem;
   cursor: pointer;
-  display: none; /* Shadow on desktop */
+  display: none; /* Hidden on desktop */
   align-items: center;
   justify-content: center;
   transition: all 0.25s ease;
+  margin-left: 8px;
 }
 
 /* ── Controls ── */
