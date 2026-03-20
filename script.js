@@ -47,6 +47,23 @@ document.getElementById("audioToggle").addEventListener("click", async () => {
   btn.classList.toggle("active", playing);
 });
 
+// ── Menu Toggle ──
+const menuToggle = document.getElementById("menuToggle");
+const controlsWrapper = document.getElementById("controls-wrapper");
+
+menuToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  controlsWrapper.classList.toggle("visible");
+});
+
+window.addEventListener("click", () => {
+  controlsWrapper.classList.remove("visible");
+});
+
+controlsWrapper.addEventListener("click", (e) => {
+  e.stopPropagation();
+});
+
 // ── Spider management ──
 function setSpiderCount(n) {
   spiderCount = n;
