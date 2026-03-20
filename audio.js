@@ -39,14 +39,32 @@ const AudioEngine = (() => {
       }
     }
 
-    // ═══ Master Output (No compressor — to prevent squashing) ═══
+    // ═══ Master Processing (Soft-Clipper for Loudness) ═══
+    function makeDistortionCurve(amount) {
+      const k = typeof amount === 'number' ? amount : 50;
+      const n_samples = 44100;
+      const curve = new Float32Array(n_samples);
+      const deg = Math.PI / 180;
+      for (let i = 0 ; i < n_samples; ++i ) {
+        const x = i * 2 / n_samples - 1;
+        curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+      }
+      return curve;
+    }
+
+    const clipper = audioCtx.createWaveShaper();
+    clipper.curve = makeDistortionCurve(40);
+    clipper.oversample = '4x';
+
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 2.0; // High headroom
+    masterGain.gain.value = 4.0; // PUSH IT LOUD
+    
+    clipper.connect(masterGain);
     masterGain.connect(audioCtx.destination);
 
     dryGain = audioCtx.createGain();
     dryGain.gain.value = 1.0;
-    dryGain.connect(masterGain);
+    dryGain.connect(clipper);
 
     // ═══ Delay ═══
     delayNode = audioCtx.createDelay(3.0);
@@ -63,7 +81,7 @@ const AudioEngine = (() => {
     delayFilter.connect(feedbackGain);
     feedbackGain.connect(delayNode);
     feedbackGain.connect(delayWet);
-    delayWet.connect(masterGain); // Direct to master
+    delayWet.connect(clipper);
 
     // ═══ Reverb ═══
     convolver = audioCtx.createConvolver();
@@ -71,7 +89,7 @@ const AudioEngine = (() => {
     reverbGain = audioCtx.createGain();
     reverbGain.gain.value = 0.25;
     convolver.connect(reverbGain);
-    reverbGain.connect(masterGain); // Direct to master
+    reverbGain.connect(clipper);
 
     // ═══ Drone ═══
     // Inner gain (modulated by cave texture) → Outer gain (user volume control)
@@ -152,9 +170,9 @@ const AudioEngine = (() => {
 
     // Ultra-short envelope
     const env = audioCtx.createGain();
-    const decay = 0.006 + Math.random() * 0.014;
+    const decay = 0.01 + Math.random() * 0.02; // Slightly longer decay
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(vol * 0.08, now + 0.0015); // Much lower peak (0.08) for layering
+    env.gain.linearRampToValueAtTime(vol * 0.4, now + 0.0015); // Much higher peak (0.4)
     env.gain.exponentialRampToValueAtTime(0.001, now + 0.002 + decay);
 
     // Pan
