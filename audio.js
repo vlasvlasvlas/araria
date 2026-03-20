@@ -41,20 +41,20 @@ const AudioEngine = (() => {
 
     // ═══ Master Processing ═══
     const compressor = audioCtx.createDynamicsCompressor();
-    compressor.threshold.setValueAtTime(-20, audioCtx.currentTime);
-    compressor.knee.setValueAtTime(40, audioCtx.currentTime);
-    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-    compressor.attack.setValueAtTime(0, audioCtx.currentTime);
-    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+    compressor.threshold.setValueAtTime(-12, audioCtx.currentTime); // Higher threshold
+    compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+    compressor.ratio.setValueAtTime(4, audioCtx.currentTime); // Lower ratio for less squash
+    compressor.attack.setValueAtTime(0.003, audioCtx.currentTime); 
+    compressor.release.setValueAtTime(0.1, audioCtx.currentTime);
 
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.85;
+    masterGain.gain.value = 1.2; // Boosted master gain
     
     compressor.connect(masterGain);
     masterGain.connect(audioCtx.destination);
 
     dryGain = audioCtx.createGain();
-    dryGain.gain.value = 0.9;
+    dryGain.gain.value = 1.0;
     dryGain.connect(compressor);
 
     // ═══ Delay ═══
@@ -163,7 +163,7 @@ const AudioEngine = (() => {
     const env = audioCtx.createGain();
     const decay = 0.006 + Math.random() * 0.014;
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(vol * 0.8, now + 0.0015);
+    env.gain.linearRampToValueAtTime(vol * 0.2, now + 0.0015); // Peak 0.2 instead of 0.8
     env.gain.exponentialRampToValueAtTime(0.001, now + 0.002 + decay);
 
     // Pan
