@@ -15,7 +15,7 @@ const AudioEngine = (() => {
   // Params
   let insectVol = 80;
   let droneVol = 0;
-  let ambienteLevel = 40;
+  let ambienteLevel = 25;
   let spiderTexture = 75;
 
   function init() {

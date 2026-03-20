@@ -164,12 +164,7 @@ function spawn() {
 setSpiderCount(spiderCount);
 
 // ── Pointer tracking ──
-let firstInteract = true;
-async function move(e) {
-  if (firstInteract) {
-    if (!AudioEngine.isPlaying()) AudioEngine.toggle();
-    firstInteract = false;
-  }
+function move(e) {
   mouseX = e.clientX;
   mouseY = e.clientY;
   spiders.forEach((spider) => spider.follow(e.clientX, e.clientY));
