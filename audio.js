@@ -39,23 +39,14 @@ const AudioEngine = (() => {
       }
     }
 
-    // ═══ Master Processing ═══
-    const compressor = audioCtx.createDynamicsCompressor();
-    compressor.threshold.setValueAtTime(-12, audioCtx.currentTime); // Higher threshold
-    compressor.knee.setValueAtTime(30, audioCtx.currentTime);
-    compressor.ratio.setValueAtTime(4, audioCtx.currentTime); // Lower ratio for less squash
-    compressor.attack.setValueAtTime(0.003, audioCtx.currentTime); 
-    compressor.release.setValueAtTime(0.1, audioCtx.currentTime);
-
+    // ═══ Master Output (No compressor — to prevent squashing) ═══
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 1.2; // Boosted master gain
-    
-    compressor.connect(masterGain);
+    masterGain.gain.value = 2.0; // High headroom
     masterGain.connect(audioCtx.destination);
 
     dryGain = audioCtx.createGain();
     dryGain.gain.value = 1.0;
-    dryGain.connect(compressor);
+    dryGain.connect(masterGain);
 
     // ═══ Delay ═══
     delayNode = audioCtx.createDelay(3.0);
@@ -72,7 +63,7 @@ const AudioEngine = (() => {
     delayFilter.connect(feedbackGain);
     feedbackGain.connect(delayNode);
     feedbackGain.connect(delayWet);
-    delayWet.connect(compressor);
+    delayWet.connect(masterGain); // Direct to master
 
     // ═══ Reverb ═══
     convolver = audioCtx.createConvolver();
@@ -80,7 +71,7 @@ const AudioEngine = (() => {
     reverbGain = audioCtx.createGain();
     reverbGain.gain.value = 0.25;
     convolver.connect(reverbGain);
-    reverbGain.connect(compressor);
+    reverbGain.connect(masterGain); // Direct to master
 
     // ═══ Drone ═══
     // Inner gain (modulated by cave texture) → Outer gain (user volume control)
@@ -163,7 +154,7 @@ const AudioEngine = (() => {
     const env = audioCtx.createGain();
     const decay = 0.006 + Math.random() * 0.014;
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(vol * 0.2, now + 0.0015); // Peak 0.2 instead of 0.8
+    env.gain.linearRampToValueAtTime(vol * 0.08, now + 0.0015); // Much lower peak (0.08) for layering
     env.gain.exponentialRampToValueAtTime(0.001, now + 0.002 + decay);
 
     // Pan
