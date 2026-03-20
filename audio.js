@@ -10,7 +10,7 @@ const AudioEngine = (() => {
   let delayNode, feedbackGain, delayWet, delayFilter;
   let convolver, reverbGain;
   let droneOsc1, droneOsc2, droneSub, droneGain, droneOuterGain;
-  let noiseBuffer;
+  let noiseBuffer, clipper;
 
   // Params
   let insectVol = 80;
@@ -52,7 +52,7 @@ const AudioEngine = (() => {
       return curve;
     }
 
-    const clipper = audioCtx.createWaveShaper();
+    clipper = audioCtx.createWaveShaper();
     clipper.curve = makeDistortionCurve(40);
     clipper.oversample = '4x';
 
