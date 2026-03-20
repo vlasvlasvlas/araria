@@ -16,7 +16,7 @@ const AudioEngine = (() => {
   let insectVol = 80;
   let droneVol = 0;
   let ambienteLevel = 40;
-  let spiderTexture = 50;
+  let spiderTexture = 75;
 
   function init() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
