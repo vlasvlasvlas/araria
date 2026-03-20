@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Araria — Spider Cursor Animation</title>
+  <meta name="description" content="Araria: interactive spider animation with procedural audio">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+  <header id="controls-bar">
+    <div class="controls-left">
+      <h1 class="logo">🕷️ Araria</h1>
+
+      <div class="control-group" title="Cantidad de arañas">
+        <span class="ctrl-icon">🕸️</span>
+        <input type="range" id="spiderCount" min="1" max="20" value="2">
+        <span id="spiderCountVal" class="badge">2</span>
+      </div>
+
+      <div class="control-group" title="Velocidad de movimiento">
+        <span class="ctrl-icon">💨</span>
+        <input type="range" id="followSpeed" min="1" max="100" value="50">
+        <span id="followSpeedVal" class="badge">50</span>
+      </div>
+    </div>
+
+    <div class="controls-right">
+      <button id="audioToggle" class="audio-btn" title="Audio on/off">🔇</button>
+
+      <div class="control-group" title="Volumen patas">
+        <span class="ctrl-icon">🦗</span>
+        <input type="range" id="insectVol" min="0" max="100" value="80">
+      </div>
+
+      <div class="control-group" title="Drone ambiental">
+        <span class="ctrl-icon">🌑</span>
+        <input type="range" id="droneVol" min="0" max="100" value="0">
+      </div>
+
+      <div class="control-group" title="Ambiente (reverb + delay)">
+        <span class="ctrl-icon">🌊</span>
+        <input type="range" id="ambiente" min="0" max="100" value="40">
+      </div>
+    </div>
+  </header>
+
+  <canvas id="canvas"></canvas>
+
+  <script src="./audio.js"></script>
+  <script src="./script.js"></script>
+</body>
+
+</html>
