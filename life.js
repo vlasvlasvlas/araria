@@ -18,23 +18,9 @@ const LifeMode = (() => {
   let holdX = 0;
   let holdY = 0;
   let lastHoldPulseAt = 0;
-  let lastCursorMoveAt = performance.now() / 1000;
-  let lastCursorMoveX = mouseX;
-  let lastCursorMoveY = mouseY;
-  let webFade = 0;
-  let webCenterX = mouseX;
-  let webCenterY = mouseY;
-  let webAnchors = [];
-  let webSegments = [];
-  let webBuildProgress = 0;
-  let webWasActive = false;
-  let lastWebBloomAt = 0;
   const HOLD_DURATION = 3;
   const HOLD_MOVE_TOLERANCE = 18;
   const HOLD_EGG_RADIUS = 12;
-  const WEB_IDLE_DELAY = 1;
-  const WEB_MOVE_THRESHOLD = 6;
-  const WEB_BUILD_DURATION = 2.8;
   const YOUNG_GROWTH = 0.26;
   const ADULT_GROWTH = 0.72;
   const OLD_AGE_RATIO = 0.72;
@@ -71,67 +57,6 @@ const LifeMode = (() => {
         ent.follow(x, y);
       }
     });
-  }
-
-  function resetWebState() {
-    webFade = 0;
-    webBuildProgress = 0;
-    webAnchors = [];
-    webSegments = [];
-    webWasActive = false;
-    lastWebBloomAt = 0;
-  }
-
-  function createWebAt(x, y) {
-    webCenterX = x;
-    webCenterY = y;
-    const spokes = 8;
-    const baseRadius = min(innerWidth, innerHeight) * 0.14;
-    const ringSteps = [0.24, 0.42, 0.6, 0.78, 0.92];
-    webAnchors = many(spokes, (i) => {
-      const angle = (i / spokes) * PI * 2 + rnd(0.12, -0.06);
-      const radius = baseRadius * (0.72 + rnd(0.28));
-      return {
-        x: webCenterX + cos(angle) * radius,
-        y: webCenterY + sin(angle) * radius,
-      };
-    });
-
-    webSegments = [];
-
-    webAnchors.forEach((anchor) => {
-      webSegments.push({
-        x0: webCenterX,
-        y0: webCenterY,
-        x1: anchor.x,
-        y1: anchor.y,
-      });
-    });
-
-    ringSteps.forEach((step) => {
-      webAnchors.forEach((anchor, idx) => {
-        const next = webAnchors[(idx + 1) % webAnchors.length];
-        webSegments.push({
-          x0: lerp(webCenterX, anchor.x, step),
-          y0: lerp(webCenterY, anchor.y, step),
-          x1: lerp(webCenterX, next.x, step),
-          y1: lerp(webCenterY, next.y, step),
-        });
-      });
-    });
-
-    webBuildProgress = 0;
-  }
-
-  function registerCursorMotion(x, y, forceReset = false) {
-    const now = performance.now() / 1000;
-    const moved = hypot(x - lastCursorMoveX, y - lastCursorMoveY);
-    if (forceReset || moved >= WEB_MOVE_THRESHOLD) {
-      lastCursorMoveAt = now;
-      lastCursorMoveX = x;
-      lastCursorMoveY = y;
-      resetWebState();
-    }
   }
 
   function cancelHold(pointerId = holdPointerId) {
@@ -338,58 +263,6 @@ const LifeMode = (() => {
     }
   }
 
-  function renderWeb(spidersNearCursor) {
-    if (webFade <= 0.01 || webSegments.length === 0) return;
-
-    const totalSegments = webSegments.length;
-    const scaledProgress = webBuildProgress * totalSegments;
-    const currentSegmentIndex = min(totalSegments - 1, max(0, Math.floor(scaledProgress)));
-    const currentSegmentProgress = min(1, max(0, scaledProgress - currentSegmentIndex));
-    const currentSegment = webSegments[currentSegmentIndex];
-    const threadTip = currentSegment ? {
-      x: lerp(currentSegment.x0, currentSegment.x1, currentSegmentProgress),
-      y: lerp(currentSegment.y0, currentSegment.y1, currentSegmentProgress),
-    } : null;
-
-    ctx.save();
-    ctx.lineWidth = 1.1 + webFade * 0.9;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.26 * webFade})`;
-    ctx.shadowBlur = 8 + webFade * 10;
-    ctx.shadowColor = `rgba(255, 255, 255, ${0.18 * webFade})`;
-
-    webSegments.forEach((segment, idx) => {
-      const segmentProgress = min(1, max(0, scaledProgress - idx));
-      if (segmentProgress <= 0) return;
-      const px = lerp(segment.x0, segment.x1, segmentProgress);
-      const py = lerp(segment.y0, segment.y1, segmentProgress);
-      ctx.beginPath();
-      ctx.moveTo(segment.x0, segment.y0);
-      ctx.lineTo(px, py);
-      ctx.globalAlpha = 0.4 + segmentProgress * 0.45;
-      ctx.stroke();
-    });
-
-    if (threadTip && spidersNearCursor.length > 0 && webBuildProgress < 1) {
-      const builder = spidersNearCursor[currentSegmentIndex % spidersNearCursor.length];
-      ctx.beginPath();
-      ctx.globalAlpha = 0.8;
-      ctx.lineWidth = 1.5 + webFade * 1.2;
-      ctx.moveTo(builder.x, builder.y);
-      ctx.lineTo(threadTip.x, threadTip.y);
-      ctx.stroke();
-    }
-
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.22 + webFade * 0.25})`;
-    webAnchors.forEach((anchor, idx) => {
-      const anchorVisible = webBuildProgress >= (idx + 1) / totalSegments;
-      if (!anchorVisible && webBuildProgress < 1) return;
-      drawCircle(ctx, anchor.x, anchor.y, 1.1 + webFade * 0.8);
-    });
-    drawCircle(ctx, webCenterX, webCenterY, 2 + webFade * 1.5);
-    ctx.restore();
-  }
-
   // ── Main tick ──
   let lastT = 0;
   function tick(t, canvasCtx) {
@@ -458,30 +331,6 @@ const LifeMode = (() => {
       ent.tick(t, dt);
     }
 
-    const aliveSpiders = entities.filter((ent) => ent.type === "spider" && ent.stage !== "dead");
-    const spidersNearCursor = aliveSpiders.filter((spider) => spider.distToCursor < FEED_RADIUS * 1.15);
-    const idleTime = t - lastCursorMoveAt;
-    const webTarget = idleTime >= WEB_IDLE_DELAY && spidersNearCursor.length > 0 ? 1 : 0;
-    webFade += (webTarget - webFade) * min(1, dt * 3.2);
-    if (webTarget) {
-      if (!webWasActive || webSegments.length === 0) {
-        createWebAt(mouseX, mouseY);
-      }
-      const buildSpeed = (1 / WEB_BUILD_DURATION) * (0.8 + spidersNearCursor.length * 0.22);
-      webBuildProgress = min(1, webBuildProgress + dt * buildSpeed);
-    }
-    if (webTarget && !webWasActive) {
-      AudioEngine.playWebBloom(mouseX, mouseY, 1);
-      lastWebBloomAt = t;
-      webWasActive = true;
-    } else if (webTarget && webBuildProgress >= 1 && t - lastWebBloomAt > 2.8) {
-      AudioEngine.playWebBloom(mouseX, mouseY, 0.55);
-      lastWebBloomAt = t;
-    } else if (!webTarget && webFade < 0.08) {
-      webWasActive = false;
-    }
-    AudioEngine.setWebPresence(webFade);
-    renderWeb(spidersNearCursor);
   }
 
   function onPointerDown(e) {
@@ -489,7 +338,6 @@ const LifeMode = (() => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.cancelable) e.preventDefault();
 
-    registerCursorMotion(e.clientX, e.clientY, true);
     updateFollowers(e.clientX, e.clientY);
     isHolding = true;
     holdPointerId = e.pointerId;
@@ -511,7 +359,6 @@ const LifeMode = (() => {
     if (isUiEventTarget(e.target)) return;
     if (e.cancelable) e.preventDefault();
 
-    registerCursorMotion(e.clientX, e.clientY);
     updateFollowers(e.clientX, e.clientY);
   }
 
@@ -539,11 +386,6 @@ const LifeMode = (() => {
     followSpeed = parseInt(document.getElementById("followSpeed").value, 10);
     mouseX = innerWidth / 2;
     mouseY = innerHeight / 2;
-    lastCursorMoveAt = performance.now() / 1000;
-    lastCursorMoveX = mouseX;
-    lastCursorMoveY = mouseY;
-    resetWebState();
-    AudioEngine.setWebPresence(0);
     cancelHold();
     document.querySelectorAll(".ambient-only").forEach(el => el.style.display = "none");
 
@@ -566,8 +408,6 @@ const LifeMode = (() => {
     removeEventListener("pointerup", onPointerUp);
     removeEventListener("pointercancel", onPointerCancel);
     removeEventListener("blur", onWindowBlur);
-    AudioEngine.setWebPresence(0);
-    resetWebState();
     cancelHold();
   }
 

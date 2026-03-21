@@ -1,84 +1,92 @@
-# 🕷️ Araria
-### Interactive spider animation with procedural horror audio.
+# Araria
 
-Arañas generativas que siguen tu cursor, con sonido procedural en tiempo real — cada clic de pata, cada eco de caverna, generado por Web Audio API. Sin samples, sin dependencias, puro vanilla.
+Animacion interactiva de aranas con audio procedural en `Canvas 2D` + `Web Audio API`, sin dependencias ni build step.
 
-## ✨ Demo
+## Modos
 
-Abrí `index.html` en tu browser. Mové el mouse. Activá el audio (🔇→🔊).
+### Ambiente
 
-## 🎮 Controles
+Modo libre donde varias aranas siguen el cursor o el toque.
 
-| Control | Función |
-|---------|---------|
-| 🕸️ | Cantidad de arañas (1-20) |
-| 💨 | Velocidad de seguimiento |
-| 🔊/🔇 | Audio on/off |
-| 🦗 | Volumen de patas (clicks de insecto) |
-| 🌑 | Drone ambiental (caverna oscura) |
-| 🌊 | Ambiente (reverb + delay combinados) |
+- Las aranas reaccionan al movimiento en desktop y mobile.
+- Se puede ajustar cantidad, velocidad, textura y audio.
 
-## 🔊 Audio Procedural
+### Vida
 
-Todo el audio se genera en tiempo real con **Web Audio API**:
+Modo de ciclo de vida con huevos, nacimiento, crecimiento y muerte.
 
-- **Clicks de patas**: noise bursts filtrados (bandpass 2-6kHz) que se disparan cuando cada pata toca el suelo visualmente
-- **Drone**: osciladores sine detuned (58-63Hz) + sub-bass + textura de caverna
-- **Reverb**: impulse response sintético de 3 segundos (caverna oscura)
-- **Delay**: feedback loop con filtro lowpass para eco repetitivo
+- Mantener presionado `3 segundos` crea un huevo.
+- Si se mueve el mouse o el dedo durante el hold, la creacion se cancela.
+- El huevo eclosiona mas rapido cerca del cursor.
+- La arana nace muy chica, empieza con pocas patas y crece mientras se alimenta cerca del cursor.
+- Lejos del cursor envejece y muere mas rapido.
 
-Cada pata tiene un pitch ligeramente distinto. El sonido se panea estéreo según la posición en pantalla.
+## Controles
 
-## 🛠️ Tech Stack
+Controles compartidos:
 
-- HTML5 Canvas 2D
-- Vanilla JavaScript (ES6+)
-- Web Audio API
-- Vanilla CSS
-- Google Fonts (Outfit)
+- `💨` velocidad
+- `🦗` volumen de patas
+- `🌑` drone
+- `🌊` ambiente (`reverb + delay`)
+- `🔇 / 🔊` audio global
 
-**Cero dependencias. Cero bundlers. Cero frameworks.**
+Controles solo de `Ambiente`:
 
-## 📁 Estructura
+- `🕸️` cantidad de aranas
+- `🧪` textura sonora de las patas
 
+Navegacion:
+
+- Click en `🕷️ Araria` para volver al menu inicial y elegir modo otra vez.
+
+## Uso local
+
+Clonar el repo y abrir `index.html` en el navegador.
+
+```bash
+git clone https://github.com/vlasvlasvlas/araria.git
+cd araria
 ```
+
+Si preferis un server local:
+
+```bash
+python3 -m http.server 8080
+```
+
+Luego abrir `http://localhost:8080`.
+
+## Estructura
+
+```text
 araria/
-├── index.html    → Estructura y controles UI
-├── style.css     → Estilos (glassmorphism header, sliders custom)
-├── script.js     → Arañas, animación, interacción
-├── audio.js      → Motor de audio procedural
+├── index.html
+├── style.css
+├── audio.js
+├── script.js
+├── life.js
+├── game.js
 └── README.md
 ```
 
-## 🚀 Uso
+## Archivos principales
 
-```bash
-# Clonar
-git clone https://github.com/tu-usuario/araria.git
+- `audio.js`: motor de audio procedural, drones, ambiente y sonidos de patas, huevo, eclosion y muerte.
+- `script.js`: modo `Ambiente`.
+- `life.js`: modo `Vida`.
+- `game.js`: menu, cambio de modo, loop principal y controles compartidos.
 
-# Abrir
-open araria/index.html
-```
+## Stack
 
-O simplemente servir con cualquier servidor local:
-```bash
-npx serve .
-```
+- HTML5
+- CSS
+- JavaScript vanilla
+- Canvas 2D
+- Web Audio API
 
-## 🔮 Roadmap
+## Estado actual
 
-- [x] Arañas generativas con patas orgánicas
-- [x] Audio procedural ligado a movimiento de patas
-- [x] Controles de audio (insecto, drone, ambiente)
-- [ ] **Modo Juego**: clicks para colocar huevos, ciclo de vida (egg→baby→adult→old→dead)
-- [ ] Reproducción automática y genética heredable
-- [ ] Audio adaptivo por población
-- [ ] Zoom, paredes, guardar/cargar colonia
-
-## 🎨 Créditos
-
-- Basado originalmente en un script de **codetutor** donde elementos seguían al cursor.
-
-## 📄 Licencia
-
-MIT
+- Funciona en desktop y mobile.
+- No usa dependencias externas de runtime.
+- No incluye sistema de telas de arana.

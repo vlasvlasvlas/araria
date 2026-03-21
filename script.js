@@ -123,7 +123,6 @@ const AmbientMode = (() => {
   function start() {
     active = true;
     spiders = [];
-    AudioEngine.setWebPresence(0);
     setSpiderCount(spiderCount);
 
     // Show ambient-only controls
