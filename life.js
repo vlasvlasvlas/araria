@@ -25,6 +25,8 @@ const LifeMode = (() => {
   let webCenterX = mouseX;
   let webCenterY = mouseY;
   let webAnchors = [];
+  let webSegments = [];
+  let webBuildProgress = 0;
   let webWasActive = false;
   let lastWebBloomAt = 0;
   const HOLD_DURATION = 3;
@@ -32,6 +34,7 @@ const LifeMode = (() => {
   const HOLD_EGG_RADIUS = 12;
   const WEB_IDLE_DELAY = 1;
   const WEB_MOVE_THRESHOLD = 6;
+  const WEB_BUILD_DURATION = 2.8;
   const YOUNG_GROWTH = 0.26;
   const ADULT_GROWTH = 0.72;
   const OLD_AGE_RATIO = 0.72;
@@ -70,11 +73,21 @@ const LifeMode = (() => {
     });
   }
 
+  function resetWebState() {
+    webFade = 0;
+    webBuildProgress = 0;
+    webAnchors = [];
+    webSegments = [];
+    webWasActive = false;
+    lastWebBloomAt = 0;
+  }
+
   function createWebAt(x, y) {
     webCenterX = x;
     webCenterY = y;
     const spokes = 8;
     const baseRadius = min(innerWidth, innerHeight) * 0.14;
+    const ringSteps = [0.24, 0.42, 0.6, 0.78, 0.92];
     webAnchors = many(spokes, (i) => {
       const angle = (i / spokes) * PI * 2 + rnd(0.12, -0.06);
       const radius = baseRadius * (0.72 + rnd(0.28));
@@ -83,6 +96,31 @@ const LifeMode = (() => {
         y: webCenterY + sin(angle) * radius,
       };
     });
+
+    webSegments = [];
+
+    webAnchors.forEach((anchor) => {
+      webSegments.push({
+        x0: webCenterX,
+        y0: webCenterY,
+        x1: anchor.x,
+        y1: anchor.y,
+      });
+    });
+
+    ringSteps.forEach((step) => {
+      webAnchors.forEach((anchor, idx) => {
+        const next = webAnchors[(idx + 1) % webAnchors.length];
+        webSegments.push({
+          x0: lerp(webCenterX, anchor.x, step),
+          y0: lerp(webCenterY, anchor.y, step),
+          x1: lerp(webCenterX, next.x, step),
+          y1: lerp(webCenterY, next.y, step),
+        });
+      });
+    });
+
+    webBuildProgress = 0;
   }
 
   function registerCursorMotion(x, y, forceReset = false) {
@@ -92,8 +130,7 @@ const LifeMode = (() => {
       lastCursorMoveAt = now;
       lastCursorMoveX = x;
       lastCursorMoveY = y;
-      webFade = 0;
-      createWebAt(x, y);
+      resetWebState();
     }
   }
 
@@ -302,47 +339,51 @@ const LifeMode = (() => {
   }
 
   function renderWeb(spidersNearCursor) {
-    if (webFade <= 0.01 || webAnchors.length < 3) return;
+    if (webFade <= 0.01 || webSegments.length === 0) return;
 
-    const ringSteps = [0.28, 0.48, 0.68, 0.88];
+    const totalSegments = webSegments.length;
+    const scaledProgress = webBuildProgress * totalSegments;
+    const currentSegmentIndex = min(totalSegments - 1, max(0, Math.floor(scaledProgress)));
+    const currentSegmentProgress = min(1, max(0, scaledProgress - currentSegmentIndex));
+    const currentSegment = webSegments[currentSegmentIndex];
+    const threadTip = currentSegment ? {
+      x: lerp(currentSegment.x0, currentSegment.x1, currentSegmentProgress),
+      y: lerp(currentSegment.y0, currentSegment.y1, currentSegmentProgress),
+    } : null;
+
     ctx.save();
     ctx.lineWidth = 1.1 + webFade * 0.9;
     ctx.strokeStyle = `rgba(255, 255, 255, ${0.26 * webFade})`;
     ctx.shadowBlur = 8 + webFade * 10;
     ctx.shadowColor = `rgba(255, 255, 255, ${0.18 * webFade})`;
 
-    webAnchors.forEach((anchor) => {
+    webSegments.forEach((segment, idx) => {
+      const segmentProgress = min(1, max(0, scaledProgress - idx));
+      if (segmentProgress <= 0) return;
+      const px = lerp(segment.x0, segment.x1, segmentProgress);
+      const py = lerp(segment.y0, segment.y1, segmentProgress);
       ctx.beginPath();
-      ctx.moveTo(webCenterX, webCenterY);
-      ctx.lineTo(anchor.x, anchor.y);
+      ctx.moveTo(segment.x0, segment.y0);
+      ctx.lineTo(px, py);
+      ctx.globalAlpha = 0.4 + segmentProgress * 0.45;
       ctx.stroke();
     });
 
-    ringSteps.forEach((step, ringIndex) => {
+    if (threadTip && spidersNearCursor.length > 0 && webBuildProgress < 1) {
+      const builder = spidersNearCursor[currentSegmentIndex % spidersNearCursor.length];
       ctx.beginPath();
-      webAnchors.forEach((anchor, idx) => {
-        const px = lerp(webCenterX, anchor.x, step);
-        const py = lerp(webCenterY, anchor.y, step);
-        if (idx === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      const first = webAnchors[0];
-      ctx.lineTo(lerp(webCenterX, first.x, step), lerp(webCenterY, first.y, step));
-      ctx.globalAlpha = 0.68 + ringIndex * 0.08;
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 1.5 + webFade * 1.2;
+      ctx.moveTo(builder.x, builder.y);
+      ctx.lineTo(threadTip.x, threadTip.y);
       ctx.stroke();
-    });
-
-    ctx.globalAlpha = 0.55 + webFade * 0.35;
-    spidersNearCursor.forEach((spider) => {
-      ctx.beginPath();
-      ctx.moveTo(spider.x, spider.y);
-      ctx.lineTo(webCenterX, webCenterY);
-      ctx.stroke();
-    });
+    }
 
     ctx.shadowBlur = 0;
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.35 + webFade * 0.3})`;
-    webAnchors.forEach((anchor) => {
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.22 + webFade * 0.25})`;
+    webAnchors.forEach((anchor, idx) => {
+      const anchorVisible = webBuildProgress >= (idx + 1) / totalSegments;
+      if (!anchorVisible && webBuildProgress < 1) return;
       drawCircle(ctx, anchor.x, anchor.y, 1.1 + webFade * 0.8);
     });
     drawCircle(ctx, webCenterX, webCenterY, 2 + webFade * 1.5);
@@ -423,13 +464,17 @@ const LifeMode = (() => {
     const webTarget = idleTime >= WEB_IDLE_DELAY && spidersNearCursor.length > 0 ? 1 : 0;
     webFade += (webTarget - webFade) * min(1, dt * 3.2);
     if (webTarget) {
-      createWebAt(mouseX, mouseY);
+      if (!webWasActive || webSegments.length === 0) {
+        createWebAt(mouseX, mouseY);
+      }
+      const buildSpeed = (1 / WEB_BUILD_DURATION) * (0.8 + spidersNearCursor.length * 0.22);
+      webBuildProgress = min(1, webBuildProgress + dt * buildSpeed);
     }
     if (webTarget && !webWasActive) {
       AudioEngine.playWebBloom(mouseX, mouseY, 1);
       lastWebBloomAt = t;
       webWasActive = true;
-    } else if (webTarget && t - lastWebBloomAt > 2.8) {
+    } else if (webTarget && webBuildProgress >= 1 && t - lastWebBloomAt > 2.8) {
       AudioEngine.playWebBloom(mouseX, mouseY, 0.55);
       lastWebBloomAt = t;
     } else if (!webTarget && webFade < 0.08) {
@@ -497,10 +542,7 @@ const LifeMode = (() => {
     lastCursorMoveAt = performance.now() / 1000;
     lastCursorMoveX = mouseX;
     lastCursorMoveY = mouseY;
-    webFade = 0;
-    webWasActive = false;
-    lastWebBloomAt = 0;
-    createWebAt(mouseX, mouseY);
+    resetWebState();
     AudioEngine.setWebPresence(0);
     cancelHold();
     document.querySelectorAll(".ambient-only").forEach(el => el.style.display = "none");
@@ -525,6 +567,7 @@ const LifeMode = (() => {
     removeEventListener("pointercancel", onPointerCancel);
     removeEventListener("blur", onWindowBlur);
     AudioEngine.setWebPresence(0);
+    resetWebState();
     cancelHold();
   }
 
