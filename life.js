@@ -25,7 +25,7 @@ const LifeMode = (() => {
   let webCenterX = mouseX;
   let webCenterY = mouseY;
   let webAnchors = [];
-  const HOLD_DURATION = 2.5;
+  const HOLD_DURATION = 3;
   const HOLD_MOVE_TOLERANCE = 18;
   const HOLD_EGG_RADIUS = 12;
   const WEB_IDLE_DELAY = 1;
@@ -33,8 +33,8 @@ const LifeMode = (() => {
   const YOUNG_GROWTH = 0.26;
   const ADULT_GROWTH = 0.72;
   const OLD_AGE_RATIO = 0.72;
-  const STARVING_TO_OLD = 6;
-  const STARVING_TO_DEAD = 12;
+  const STARVING_TO_OLD = 10;
+  const STARVING_TO_DEAD = 18;
 
   // ── Life stage config ──
   const STAGES = {
@@ -72,7 +72,7 @@ const LifeMode = (() => {
     webCenterX = x;
     webCenterY = y;
     const spokes = 8;
-    const baseRadius = min(innerWidth, innerHeight) * 0.11;
+    const baseRadius = min(innerWidth, innerHeight) * 0.14;
     webAnchors = many(spokes, (i) => {
       const angle = (i / spokes) * PI * 2 + rnd(0.12, -0.06);
       const radius = baseRadius * (0.72 + rnd(0.28));
@@ -113,7 +113,7 @@ const LifeMode = (() => {
       maxSize: 0.8 + rnd(0.4),
       speedMul: 0.7 + rnd(0.6),
       voracidad: 0.8 + rnd(0.4),
-      lifetime: 150 + rnd(150),
+      lifetime: 280 + rnd(220),
     };
 
     const pts = many(333, () => ({
@@ -210,7 +210,7 @@ const LifeMode = (() => {
           this.starvingTime += (0.18 + (1 - this.nutrition) * 0.95) * dt;
         }
 
-        this.age += dt * (0.2 + (1 - this.nutrition) * 0.6 + (this.isFeeding ? 0.04 : 0.28));
+        this.age += dt * (0.16 + (1 - this.nutrition) * 0.48 + (this.isFeeding ? 0.03 : 0.2));
         this.refreshStage();
 
         if (this.stage === "dead") return;
@@ -299,13 +299,15 @@ const LifeMode = (() => {
     }
   }
 
-  function renderWeb(t, spidersNearCursor) {
+  function renderWeb(spidersNearCursor) {
     if (webFade <= 0.01 || webAnchors.length < 3) return;
 
     const ringSteps = [0.28, 0.48, 0.68, 0.88];
     ctx.save();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * webFade})`;
+    ctx.lineWidth = 1.1 + webFade * 0.9;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.26 * webFade})`;
+    ctx.shadowBlur = 8 + webFade * 10;
+    ctx.shadowColor = `rgba(255, 255, 255, ${0.18 * webFade})`;
 
     webAnchors.forEach((anchor) => {
       ctx.beginPath();
@@ -324,17 +326,24 @@ const LifeMode = (() => {
       });
       const first = webAnchors[0];
       ctx.lineTo(lerp(webCenterX, first.x, step), lerp(webCenterY, first.y, step));
-      ctx.globalAlpha = 0.55 + ringIndex * 0.08;
+      ctx.globalAlpha = 0.68 + ringIndex * 0.08;
       ctx.stroke();
     });
 
-    ctx.globalAlpha = 0.35 + webFade * 0.35;
+    ctx.globalAlpha = 0.55 + webFade * 0.35;
     spidersNearCursor.forEach((spider) => {
       ctx.beginPath();
       ctx.moveTo(spider.x, spider.y);
       ctx.lineTo(webCenterX, webCenterY);
       ctx.stroke();
     });
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.35 + webFade * 0.3})`;
+    webAnchors.forEach((anchor) => {
+      drawCircle(ctx, anchor.x, anchor.y, 1.1 + webFade * 0.8);
+    });
+    drawCircle(ctx, webCenterX, webCenterY, 2 + webFade * 1.5);
     ctx.restore();
   }
 
@@ -377,17 +386,6 @@ const LifeMode = (() => {
       }
     }
 
-    const aliveSpiders = entities.filter((ent) => ent.type === "spider" && ent.stage !== "dead");
-    const spidersNearCursor = aliveSpiders.filter((spider) => spider.distToCursor < FEED_RADIUS * 1.1);
-    const idleTime = t - lastCursorMoveAt;
-    const webTarget = idleTime >= WEB_IDLE_DELAY && spidersNearCursor.length > 0 ? 1 : 0;
-    webFade += (webTarget - webFade) * min(1, dt * 3.2);
-    if (webTarget && webAnchors.length === 0) {
-      createWebAt(mouseX, mouseY);
-    }
-    AudioEngine.setWebPresence(webFade);
-    renderWeb(t, spidersNearCursor);
-
     for (let i = entities.length - 1; i >= 0; i--) {
       const ent = entities[i];
 
@@ -416,6 +414,17 @@ const LifeMode = (() => {
 
       ent.tick(t, dt);
     }
+
+    const aliveSpiders = entities.filter((ent) => ent.type === "spider" && ent.stage !== "dead");
+    const spidersNearCursor = aliveSpiders.filter((spider) => spider.distToCursor < FEED_RADIUS * 1.15);
+    const idleTime = t - lastCursorMoveAt;
+    const webTarget = idleTime >= WEB_IDLE_DELAY && spidersNearCursor.length > 0 ? 1 : 0;
+    webFade += (webTarget - webFade) * min(1, dt * 3.2);
+    if (webTarget) {
+      createWebAt(mouseX, mouseY);
+    }
+    AudioEngine.setWebPresence(webFade);
+    renderWeb(spidersNearCursor);
   }
 
   function onPointerDown(e) {

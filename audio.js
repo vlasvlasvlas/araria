@@ -400,7 +400,7 @@ const AudioEngine = (() => {
     osc.stop(now + 0.25);
   }
 
-  // ═══ Hatch sound (mouth-like plop, no tail) ═══
+  // ═══ Hatch sound (simple plop) ═══
   function playHatch(x, y) {
     if (!started) return;
     const now = audioCtx.currentTime;
@@ -409,40 +409,21 @@ const AudioEngine = (() => {
 
     const popOsc = audioCtx.createOscillator();
     popOsc.type = "sine";
-    popOsc.frequency.setValueAtTime(190, now);
-    popOsc.frequency.exponentialRampToValueAtTime(110, now + 0.032);
+    popOsc.frequency.setValueAtTime(165, now);
+    popOsc.frequency.exponentialRampToValueAtTime(88, now + 0.05);
 
     const popEnv = audioCtx.createGain();
     popEnv.gain.setValueAtTime(0, now);
-    popEnv.gain.linearRampToValueAtTime(0.24, now + 0.002);
-    popEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.042);
-
-    const shellSrc = audioCtx.createBufferSource();
-    shellSrc.buffer = noiseBuffer;
-
-    const shellBp = audioCtx.createBiquadFilter();
-    shellBp.type = "bandpass";
-    shellBp.frequency.value = 1400 + Math.random() * 250;
-    shellBp.Q.value = 2.2;
-
-    const shellEnv = audioCtx.createGain();
-    shellEnv.gain.setValueAtTime(0, now);
-    shellEnv.gain.linearRampToValueAtTime(0.05, now + 0.001);
-    shellEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+    popEnv.gain.linearRampToValueAtTime(0.18, now + 0.002);
+    popEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
     popOsc.connect(popEnv);
     popEnv.connect(pan);
 
-    shellSrc.connect(shellBp);
-    shellBp.connect(shellEnv);
-    shellEnv.connect(pan);
-
     pan.connect(clipper);
 
     popOsc.start(now);
-    popOsc.stop(now + 0.05);
-    shellSrc.start(now, Math.random() * 0.4, 0.022);
-    shellSrc.stop(now + 0.022);
+    popOsc.stop(now + 0.065);
   }
 
   // ═══ Ambiente control ═══
