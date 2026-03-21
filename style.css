@@ -215,6 +215,15 @@ input {
   background-clip: text;
   user-select: none;
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.logo:hover,
+.logo:focus-visible {
+  transform: scale(1.03);
+  filter: brightness(1.15);
+  outline: none;
 }
 
 /* ── Menu Btn ── */

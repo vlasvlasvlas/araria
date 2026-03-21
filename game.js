@@ -6,12 +6,15 @@
   const ctx = canvas.getContext("2d");
   const modeSelect = document.getElementById("mode-select");
   const controlsBar = document.getElementById("controls-bar");
+  const controlsWrapper = document.getElementById("controls-wrapper");
+  const homeLogo = document.getElementById("homeLogo");
 
   let currentMode = null; // "ambient" | "life"
   let w, h;
   let dpr = 1;
   let controlsWired = false;
   let loopStarted = false;
+  let modeSelectHideTimer = null;
 
   // ── Shared audio controls ──
   function wireAudioControls() {
@@ -39,7 +42,6 @@
 
     // Menu toggle (mobile)
     const menuToggle = document.getElementById("menuToggle");
-    const controlsWrapper = document.getElementById("controls-wrapper");
     menuToggle.addEventListener("click", (e) => {
       e.stopPropagation();
       controlsWrapper.classList.toggle("visible");
@@ -75,18 +77,54 @@
     startMode("life");
   });
 
+  homeLogo.addEventListener("click", returnToMenu);
+  homeLogo.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      returnToMenu();
+    }
+  });
+
+  function stopCurrentMode() {
+    if (currentMode === "ambient") {
+      AmbientMode.stop();
+    } else if (currentMode === "life") {
+      LifeMode.stop();
+    }
+  }
+
+  function returnToMenu() {
+    if (!currentMode) return;
+
+    stopCurrentMode();
+    currentMode = null;
+    controlsWrapper.classList.remove("visible");
+    controlsBar.classList.add("hidden");
+    if (modeSelectHideTimer) {
+      clearTimeout(modeSelectHideTimer);
+      modeSelectHideTimer = null;
+    }
+    modeSelect.style.display = "flex";
+    modeSelect.classList.remove("fade-out");
+  }
+
   function startMode(mode) {
     if (currentMode) return;
     currentMode = mode;
 
     // Fade out selection screen
     modeSelect.classList.add("fade-out");
-    setTimeout(() => {
+    if (modeSelectHideTimer) {
+      clearTimeout(modeSelectHideTimer);
+    }
+    modeSelectHideTimer = setTimeout(() => {
       modeSelect.style.display = "none";
+      modeSelectHideTimer = null;
     }, 600);
 
     // Show controls
     controlsBar.classList.remove("hidden");
+    controlsWrapper.classList.remove("visible");
 
     wireAudioControls();
 
@@ -110,7 +148,7 @@
 
       if (currentMode === "ambient") {
         AmbientMode.tick(t, ctx);
-      } else {
+      } else if (currentMode === "life") {
         LifeMode.tick(t, ctx);
       }
 

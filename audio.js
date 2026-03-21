@@ -333,47 +333,29 @@ const AudioEngine = (() => {
     src.stop(now + total);
   }
 
-  // ═══ Egg placement (warm, low, powerful pulse) ═══
+  // ═══ Egg placement (simple short plop) ═══
   function playEggPlace(x, y) {
     if (!started) return;
     const now = audioCtx.currentTime;
-
-    // Main tone — lower and warmer
-    const osc1 = audioCtx.createOscillator();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(200, now);
-    osc1.frequency.exponentialRampToValueAtTime(450, now + 0.15);
-    osc1.frequency.exponentialRampToValueAtTime(300, now + 0.5);
-
-    // Warm harmonic
-    const osc2 = audioCtx.createOscillator();
-    osc2.type = "triangle"; // softer harmonic
-    osc2.frequency.setValueAtTime(100, now);
-    osc2.frequency.exponentialRampToValueAtTime(220, now + 0.2);
+    const osc = audioCtx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(145, now);
+    osc.frequency.exponentialRampToValueAtTime(86, now + 0.05);
 
     const env = audioCtx.createGain();
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(0.4, now + 0.05); // more powerful start
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 600;
+    env.gain.linearRampToValueAtTime(0.2, now + 0.002);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
     const pan = audioCtx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
 
-    osc1.connect(env);
-    osc2.connect(env);
-    env.connect(filter);
-    filter.connect(pan);
+    osc.connect(env);
+    env.connect(pan);
     pan.connect(clipper);
-    pan.connect(convolver);
 
-    osc1.start(now);
-    osc1.stop(now + 0.85);
-    osc2.start(now);
-    osc2.stop(now + 0.85);
+    osc.start(now);
+    osc.stop(now + 0.065);
   }
 
   // ═══ Egg pulse (heartbeat) ═══
@@ -426,6 +408,47 @@ const AudioEngine = (() => {
     popOsc.stop(now + 0.065);
   }
 
+  function playWebBloom(x, y, intensity = 1) {
+    if (!started) return;
+    const now = audioCtx.currentTime;
+    const level = Math.max(0.06, Math.min(0.22, intensity * (0.08 + droneVol / 500)));
+
+    const root = audioCtx.createOscillator();
+    root.type = "triangle";
+    root.frequency.setValueAtTime(196, now);
+    root.frequency.exponentialRampToValueAtTime(220, now + 0.7);
+
+    const fifth = audioCtx.createOscillator();
+    fifth.type = "sine";
+    fifth.frequency.setValueAtTime(293.66, now);
+    fifth.frequency.exponentialRampToValueAtTime(329.63, now + 0.9);
+
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(level, now + 0.08);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(900, now);
+    filter.frequency.linearRampToValueAtTime(1500, now + 0.6);
+
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
+
+    root.connect(env);
+    fifth.connect(env);
+    env.connect(filter);
+    filter.connect(pan);
+    pan.connect(clipper);
+    pan.connect(convolver);
+
+    root.start(now);
+    root.stop(now + 1.5);
+    fifth.start(now);
+    fifth.stop(now + 1.5);
+  }
+
   // ═══ Ambiente control ═══
   function applyAmbiente() {
     if (!started) return;
@@ -446,7 +469,7 @@ const AudioEngine = (() => {
     const now = audioCtx.currentTime;
     droneOuterGain.gain.linearRampToValueAtTime(droneVol / 100, now + 0.3);
     if (webDroneOuterGain) {
-      const webLevel = (droneVol / 100) * webPresence * 0.85;
+      const webLevel = (0.05 + (droneVol / 100) * 0.8) * webPresence * 0.85;
       webDroneOuterGain.gain.linearRampToValueAtTime(webLevel, now + 0.45);
       webDroneGain.gain.linearRampToValueAtTime(0.08 + webPresence * 0.08, now + 0.45);
     }
@@ -518,7 +541,7 @@ const AudioEngine = (() => {
   return {
     toggle, isPlaying, tick,
     legClick, legClickLife,
-    playEggPlace, playEggPulse, playHatch, playDeath,
+    playEggPlace, playEggPulse, playHatch, playDeath, playWebBloom,
     setInsectVol, setDroneVol, setAmbiente, setSpiderTexture, setWebPresence
   };
 })();

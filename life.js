@@ -25,6 +25,8 @@ const LifeMode = (() => {
   let webCenterX = mouseX;
   let webCenterY = mouseY;
   let webAnchors = [];
+  let webWasActive = false;
+  let lastWebBloomAt = 0;
   const HOLD_DURATION = 3;
   const HOLD_MOVE_TOLERANCE = 18;
   const HOLD_EGG_RADIUS = 12;
@@ -423,6 +425,16 @@ const LifeMode = (() => {
     if (webTarget) {
       createWebAt(mouseX, mouseY);
     }
+    if (webTarget && !webWasActive) {
+      AudioEngine.playWebBloom(mouseX, mouseY, 1);
+      lastWebBloomAt = t;
+      webWasActive = true;
+    } else if (webTarget && t - lastWebBloomAt > 2.8) {
+      AudioEngine.playWebBloom(mouseX, mouseY, 0.55);
+      lastWebBloomAt = t;
+    } else if (!webTarget && webFade < 0.08) {
+      webWasActive = false;
+    }
     AudioEngine.setWebPresence(webFade);
     renderWeb(spidersNearCursor);
   }
@@ -486,6 +498,8 @@ const LifeMode = (() => {
     lastCursorMoveX = mouseX;
     lastCursorMoveY = mouseY;
     webFade = 0;
+    webWasActive = false;
+    lastWebBloomAt = 0;
     createWebAt(mouseX, mouseY);
     AudioEngine.setWebPresence(0);
     cancelHold();
