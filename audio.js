@@ -215,22 +215,174 @@ const AudioEngine = (() => {
     src.stop(now + total);
   }
 
+  // ═══ LEG CLICK (Life Mode) — texture driven by life stage ═══
+  function legClickLife(screenX, screenY, pitch, stageTexture, sizeMul) {
+    if (!started) return;
+    const vol = insectVol / 100;
+    if (vol < 0.01) return;
+    const now = audioCtx.currentTime;
+    const tex = stageTexture; // 0-1, driven by life stage
+
+    const thud = audioCtx.createOscillator();
+    thud.type = "sine";
+    thud.frequency.setValueAtTime(100 + pitch * 10, now);
+    thud.frequency.exponentialRampToValueAtTime(30, now + 0.04);
+
+    const thudEnv = audioCtx.createGain();
+    thudEnv.gain.setValueAtTime(0, now);
+    thudEnv.gain.linearRampToValueAtTime(vol * (0.4 * (1 - tex)) * sizeMul, now + 0.002);
+    thudEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer;
+    const yFactor = 1 - (screenY / innerHeight);
+    const pOffset = yFactor * 1000;
+
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = (800 + pitch * 200 + pOffset) * (1 - tex) + (2200 + pitch * 400 + pOffset) * tex;
+    bp.Q.value = 10 * (1 - tex) + 2 * tex;
+
+    const pk = audioCtx.createBiquadFilter();
+    pk.type = "peaking";
+    pk.frequency.value = 4000 + pOffset;
+    pk.gain.value = -20 * (1 - tex) + 15 * tex;
+    pk.Q.value = 1.5;
+
+    const env = audioCtx.createGain();
+    const decay = (0.02 * (1 - tex)) + (0.006 * tex) + Math.random() * 0.01;
+    env.gain.setValueAtTime(0, now);
+    const attack = 0.005 * (1 - tex) + 0.001 * tex;
+    env.gain.linearRampToValueAtTime(vol * 0.3 * sizeMul, now + attack);
+    env.gain.exponentialRampToValueAtTime(0.001, now + attack + decay);
+
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (screenX / innerWidth) * 2 - 1));
+
+    thud.connect(thudEnv);
+    thudEnv.connect(pan);
+    src.connect(bp);
+    bp.connect(pk);
+    pk.connect(env);
+    env.connect(pan);
+    pan.connect(clipper);
+    pan.connect(delayNode);
+    pan.connect(convolver);
+
+    const total = 0.08;
+    thud.start(now);
+    thud.stop(now + total);
+    src.start(now, Math.random() * 0.8, total);
+    src.stop(now + total);
+  }
+
+  // ═══ Egg placement (warm, high, powerful chime) ═══
+  function playEggPlace(x, y) {
+    if (!started) return;
+    const now = audioCtx.currentTime;
+
+    // Main tone — warm sine sweep
+    const osc1 = audioCtx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(800, now);
+    osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+    osc1.frequency.exponentialRampToValueAtTime(900, now + 0.4);
+
+    // Harmonic — adds warmth
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(1600, now);
+    osc2.frequency.exponentialRampToValueAtTime(2400, now + 0.1);
+    osc2.frequency.exponentialRampToValueAtTime(1800, now + 0.35);
+
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.25, now + 0.02);
+    env.gain.linearRampToValueAtTime(0.15, now + 0.15);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+    const env2 = audioCtx.createGain();
+    env2.gain.setValueAtTime(0, now);
+    env2.gain.linearRampToValueAtTime(0.08, now + 0.02);
+    env2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
+
+    osc1.connect(env);
+    osc2.connect(env2);
+    env.connect(pan);
+    env2.connect(pan);
+    pan.connect(clipper);
+    pan.connect(convolver);
+
+    osc1.start(now);
+    osc1.stop(now + 0.55);
+    osc2.start(now);
+    osc2.stop(now + 0.35);
+  }
+
+  // ═══ Egg pulse (heartbeat) ═══
+  function playEggPulse(x, y) {
+    if (!started) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(80, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.08, now + 0.02);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
+
+    osc.connect(env);
+    env.connect(pan);
+    pan.connect(clipper);
+    osc.start(now);
+    osc.stop(now + 0.25);
+  }
+
+  // ═══ Hatch sound (crack/pop) ═══
+  function playHatch(x, y) {
+    if (!started) return;
+    const now = audioCtx.currentTime;
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer;
+
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 3000 + Math.random() * 2000;
+    bp.Q.value = 3;
+
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.5, now + 0.002);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
+
+    src.connect(bp);
+    bp.connect(env);
+    env.connect(pan);
+    pan.connect(clipper);
+    pan.connect(convolver);
+    src.start(now, Math.random() * 0.5, 0.08);
+    src.stop(now + 0.08);
+  }
+
   // ═══ Ambiente control ═══
   function applyAmbiente() {
     if (!started) return;
     const now = audioCtx.currentTime;
-    const a = ambienteLevel / 100; // 0-1
-
-    // Reverb: up to 0.8 wet
+    const a = ambienteLevel / 100;
     reverbGain.gain.linearRampToValueAtTime(a * 0.8, now + 0.2);
-
-    // Delay feedback: up to 0.75 (very repetitive at max)
     feedbackGain.gain.linearRampToValueAtTime(a * 0.75, now + 0.2);
-
-    // Delay wet: up to 0.6
     delayWet.gain.linearRampToValueAtTime(a * 0.6, now + 0.2);
-
-    // Delay time: longer at higher ambiente (0.2s → 0.5s)
     delayNode.delayTime.linearRampToValueAtTime(0.2 + a * 0.3, now + 0.3);
   }
 
@@ -238,8 +390,38 @@ const AudioEngine = (() => {
   function tick() {
     if (!started) return;
     const now = audioCtx.currentTime;
-    // Outer gain: fully zero when slider is 0, scales up to 1.0
     droneOuterGain.gain.linearRampToValueAtTime(droneVol / 100, now + 0.3);
+  }
+
+  // ═══ Death sound (low fade crack) ═══
+  function playDeath(x, y) {
+    if (!started) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.exponentialRampToValueAtTime(20, now + 0.5);
+
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(0.15, now + 0.01);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 400;
+    lp.Q.value = 5;
+
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
+
+    osc.connect(lp);
+    lp.connect(env);
+    env.connect(pan);
+    pan.connect(clipper);
+    pan.connect(convolver);
+    osc.start(now);
+    osc.stop(now + 0.7);
   }
 
   // ── Controls ──
@@ -263,5 +445,10 @@ const AudioEngine = (() => {
     return audioCtx && audioCtx.state === "running";
   }
 
-  return { toggle, isPlaying, tick, legClick, setInsectVol, setDroneVol, setAmbiente, setSpiderTexture };
+  return {
+    toggle, isPlaying, tick,
+    legClick, legClickLife,
+    playEggPlace, playEggPulse, playHatch, playDeath,
+    setInsectVol, setDroneVol, setAmbiente, setSpiderTexture
+  };
 })();
