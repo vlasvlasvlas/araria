@@ -8,6 +8,7 @@
   const controlsBar = document.getElementById("controls-bar");
   const controlsWrapper = document.getElementById("controls-wrapper");
   const homeLogo = document.getElementById("homeLogo");
+  const modeToast = document.getElementById("mode-toast");
 
   let currentMode = null; // "ambient" | "life"
   let w, h;
@@ -15,6 +16,7 @@
   let controlsWired = false;
   let loopStarted = false;
   let modeSelectHideTimer = null;
+  let modeToastTimer = null;
 
   function clearBrowserSelection() {
     const selection = window.getSelection?.();
@@ -32,6 +34,28 @@
     if (!shouldSuppressBrowserHold(e.target)) return;
     e.preventDefault();
     clearBrowserSelection();
+  }
+
+  function showModeToast(message) {
+    if (!modeToast) return;
+    modeToast.textContent = message;
+    modeToast.classList.add("visible");
+    if (modeToastTimer) {
+      clearTimeout(modeToastTimer);
+    }
+    modeToastTimer = setTimeout(() => {
+      modeToast.classList.remove("visible");
+      modeToastTimer = null;
+    }, 3200);
+  }
+
+  function hideModeToast() {
+    if (!modeToast) return;
+    if (modeToastTimer) {
+      clearTimeout(modeToastTimer);
+      modeToastTimer = null;
+    }
+    modeToast.classList.remove("visible");
   }
 
   // ── Shared audio controls ──
@@ -122,6 +146,7 @@
 
     stopCurrentMode();
     currentMode = null;
+    hideModeToast();
     controlsWrapper.classList.remove("visible");
     controlsBar.classList.add("hidden");
     if (modeSelectHideTimer) {
@@ -154,8 +179,10 @@
 
     if (mode === "ambient") {
       AmbientMode.start();
+      showModeToast("Mueve o toca para guiarlas");
     } else {
       LifeMode.start();
+      showModeToast("Sostene 1 segundo para crear huevos");
     }
 
     if (loopStarted) return;

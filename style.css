@@ -42,6 +42,39 @@ input {
   -webkit-touch-callout: none;
 }
 
+#mode-toast {
+  position: fixed;
+  top: calc(82px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 12;
+  width: min(calc(100vw - 32px), 360px);
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(6, 8, 14, 0.74);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.76rem;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+#mode-toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 /* ── Mode Selection ── */
 #mode-select {
   position: fixed;
@@ -151,6 +184,14 @@ input {
 }
 
 @media (max-width: 500px) {
+  #mode-toast {
+    top: calc(74px + env(safe-area-inset-top));
+    width: min(calc(100vw - 24px), 320px);
+    padding: 9px 12px;
+    font-size: 0.68rem;
+    letter-spacing: 0.07em;
+  }
+
   .mode-options {
     flex-direction: column;
     gap: 20px;
