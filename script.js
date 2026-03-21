@@ -106,7 +106,9 @@ const AmbientMode = (() => {
   }
 
   function onMove(e) {
-    if (!active) return;
+    if (!active || isUiEventTarget(e.target)) return;
+    if (e.pointerType === "mouse" && e.type === "pointerdown" && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
     mouseX = e.clientX;
     mouseY = e.clientY;
     spiders.forEach((spider) => spider.follow(e.clientX, e.clientY));
@@ -121,6 +123,7 @@ const AmbientMode = (() => {
   function start() {
     active = true;
     spiders = [];
+    AudioEngine.setWebPresence(0);
     setSpiderCount(spiderCount);
 
     // Show ambient-only controls
@@ -198,4 +201,8 @@ function noise(x, y, t = 101) {
 
 function pt(x, y) {
   return { x, y };
+}
+
+function isUiEventTarget(target) {
+  return target instanceof Element && Boolean(target.closest("#controls-bar, #mode-select"));
 }

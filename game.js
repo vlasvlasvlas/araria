@@ -9,9 +9,15 @@
 
   let currentMode = null; // "ambient" | "life"
   let w, h;
+  let dpr = 1;
+  let controlsWired = false;
+  let loopStarted = false;
 
   // ── Shared audio controls ──
   function wireAudioControls() {
+    if (controlsWired) return;
+    controlsWired = true;
+
     document.getElementById("insectVol").addEventListener("input", (e) => {
       AudioEngine.setInsectVol(parseInt(e.target.value, 10));
     });
@@ -46,6 +52,20 @@
     });
   }
 
+  function resizeCanvas() {
+    const nextW = innerWidth;
+    const nextH = innerHeight;
+    const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (w === nextW && h === nextH && dpr === nextDpr) return;
+
+    w = nextW;
+    h = nextH;
+    dpr = nextDpr;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
   // ── Mode selection ──
   document.getElementById("btn-ambient").addEventListener("click", () => {
     startMode("ambient");
@@ -56,6 +76,7 @@
   });
 
   function startMode(mode) {
+    if (currentMode) return;
     currentMode = mode;
 
     // Fade out selection screen
@@ -75,10 +96,12 @@
       LifeMode.start();
     }
 
+    if (loopStarted) return;
+    loopStarted = true;
+
     // Start animation loop
     requestAnimationFrame(function anim(t) {
-      if (w !== innerWidth) w = canvas.width = innerWidth;
-      if (h !== innerHeight) h = canvas.height = innerHeight;
+      resizeCanvas();
 
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);

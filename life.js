@@ -7,38 +7,108 @@ const LifeMode = (() => {
   const { sin, cos, PI, hypot, min, max } = Math;
 
   let active = false;
-  let entities = []; // eggs + spiders
+  let entities = [];
   let mouseX = innerWidth / 2;
   let mouseY = innerHeight / 2;
   let followSpeed = 50;
 
+  let holdStartTime = 0;
+  let isHolding = false;
+  let holdPointerId = null;
+  let holdX = 0;
+  let holdY = 0;
+  let lastHoldPulseAt = 0;
+  let lastCursorMoveAt = performance.now() / 1000;
+  let lastCursorMoveX = mouseX;
+  let lastCursorMoveY = mouseY;
+  let webFade = 0;
+  let webCenterX = mouseX;
+  let webCenterY = mouseY;
+  let webAnchors = [];
+  const HOLD_DURATION = 2.5;
+  const HOLD_MOVE_TOLERANCE = 18;
+  const HOLD_EGG_RADIUS = 12;
+  const WEB_IDLE_DELAY = 1;
+  const WEB_MOVE_THRESHOLD = 6;
+  const YOUNG_GROWTH = 0.26;
+  const ADULT_GROWTH = 0.72;
+  const OLD_AGE_RATIO = 0.72;
+  const STARVING_TO_OLD = 6;
+  const STARVING_TO_DEAD = 12;
+
   // ── Life stage config ──
   const STAGES = {
-    egg:   { duration: 5,   size: 0.15, speed: 0,   texture: 0.80 },
-    baby:  { duration: 45,  size: 0.3,  speed: 0.3, texture: 0.80 },
-    young: { duration: 50,  size: 0.6,  speed: 0.7, texture: 0.65 },
-    adult: { duration: 60,  size: 1.0,  speed: 1.0, texture: 0.50 },
-    old:   { duration: 40,  size: 0.8,  speed: 0.4, texture: 0.20 },
+    egg:   { duration: 4, size: 0.15, speed: 0,    texture: 0.80, legs: 0 },
+    baby:  { size: 0.16, speed: 0.55, texture: 0.82, legs: 4 },
+    young: { size: 0.5,  speed: 0.85, texture: 0.66, legs: 6 },
+    adult: { size: 1.0,  speed: 1.1,  texture: 0.50, legs: 8 },
+    old:   { size: 0.78, speed: 0.55, texture: 0.22, legs: 8 },
   };
-  const STAGE_ORDER = ["egg", "baby", "young", "adult", "old", "dead"];
-  const FEED_RADIUS = 80;
-  const FEED_RATE = 0.15; // nutrition per second when near cursor
+  const FEED_RADIUS = 100;
+  const FEED_RATE = 0.34;
 
   // ── Egg ──
   function createEgg(x, y) {
     return {
       type: "egg",
-      x, y,
+      x,
+      y,
       age: 0,
-      birthTime: 0, // set when tick starts
       hatchDuration: STAGES.egg.duration + rnd(2, -1),
-      pulsing: 0,
     };
+  }
+
+  function updateFollowers(x, y) {
+    mouseX = x;
+    mouseY = y;
+    entities.forEach((ent) => {
+      if (ent.type === "spider" && ent.follow) {
+        ent.follow(x, y);
+      }
+    });
+  }
+
+  function createWebAt(x, y) {
+    webCenterX = x;
+    webCenterY = y;
+    const spokes = 8;
+    const baseRadius = min(innerWidth, innerHeight) * 0.11;
+    webAnchors = many(spokes, (i) => {
+      const angle = (i / spokes) * PI * 2 + rnd(0.12, -0.06);
+      const radius = baseRadius * (0.72 + rnd(0.28));
+      return {
+        x: webCenterX + cos(angle) * radius,
+        y: webCenterY + sin(angle) * radius,
+      };
+    });
+  }
+
+  function registerCursorMotion(x, y, forceReset = false) {
+    const now = performance.now() / 1000;
+    const moved = hypot(x - lastCursorMoveX, y - lastCursorMoveY);
+    if (forceReset || moved >= WEB_MOVE_THRESHOLD) {
+      lastCursorMoveAt = now;
+      lastCursorMoveX = x;
+      lastCursorMoveY = y;
+      webFade = 0;
+      createWebAt(x, y);
+    }
+  }
+
+  function cancelHold(pointerId = holdPointerId) {
+    if (holdPointerId !== null && pointerId !== holdPointerId) return;
+    isHolding = false;
+    holdPointerId = null;
+    lastHoldPulseAt = 0;
+  }
+
+  function placeEgg(x, y) {
+    entities.push(createEgg(x, y));
+    AudioEngine.playEggPlace(x, y);
   }
 
   // ── Spider (Life) ──
   function createSpider(x, y) {
-    // Genetics
     const genes = {
       maxSize: 0.8 + rnd(0.4),
       speedMul: 0.7 + rnd(0.6),
@@ -47,8 +117,8 @@ const LifeMode = (() => {
     };
 
     const pts = many(333, () => ({
-      x: x + rnd(10, -5),
-      y: y + rnd(10, -5),
+      x: rnd(innerWidth),
+      y: rnd(innerHeight),
       len: 0,
       r: 0,
       _wasActive: false,
@@ -60,19 +130,27 @@ const LifeMode = (() => {
     }));
 
     let seed = rnd(100);
-    let sx = x, sy = y;
-    let tx = x, ty = y;
+    let sx = x;
+    let sy = y;
+    let tx = x;
+    let ty = y;
     let kx = rnd(0.5, 0.5);
     let ky = rnd(0.5, 0.5);
-    let walkRadius = pt(rnd(80, 40), rnd(80, 40));
+    let walkRadius = pt(rnd(150, 100), rnd(150, 100));
+    const bodyRadius = innerWidth / rnd(100, 150);
 
     return {
       type: "spider",
       genes,
-      age: 0,          // seconds alive
-      nutrition: 0,     // accumulated food
+      age: 0,
+      nutrition: 0.5,
+      growth: 0,
+      starvingTime: 0,
+      isFeeding: false,
+      distToCursor: Infinity,
       stage: "baby",
-      stageTime: 0,     // time in current stage
+      hatchAge: 0,
+      hatchDuration: 0.9,
       opacity: 1,
       deathTimer: 0,
       get x() { return sx; },
@@ -83,79 +161,106 @@ const LifeMode = (() => {
       },
 
       getTexture() {
-        // Interpolate between current and next stage texture
-        const cfg = this.getStageConfig();
-        return cfg.texture;
+        return this.getStageConfig().texture;
       },
 
       getSizeMul() {
-        const cfg = this.getStageConfig();
-        return cfg.size * this.genes.maxSize;
+        return this.getStageConfig().size * this.genes.maxSize;
+      },
+
+      getHatchProgress() {
+        return min(this.hatchAge / this.hatchDuration, 1);
+      },
+
+      refreshStage() {
+        const prevStage = this.stage;
+        const oldAge = this.genes.lifetime * OLD_AGE_RATIO;
+
+        if (this.age >= this.genes.lifetime || this.starvingTime >= STARVING_TO_DEAD) {
+          this.stage = "dead";
+        } else if (this.age >= oldAge || this.starvingTime >= STARVING_TO_OLD) {
+          this.stage = "old";
+        } else if (this.growth >= ADULT_GROWTH) {
+          this.stage = "adult";
+        } else if (this.growth >= YOUNG_GROWTH) {
+          this.stage = "young";
+        } else {
+          this.stage = "baby";
+        }
+
+        if (this.stage === "dead" && prevStage !== "dead") {
+          AudioEngine.playDeath(sx, sy);
+        }
       },
 
       tick(t, dt) {
         if (this.stage === "dead") return;
 
-        this.age += dt;
-        this.stageTime += dt;
-
-        // Check if near cursor → feed
+        this.hatchAge += dt;
         const distToCursor = hypot(sx - mouseX, sy - mouseY);
-        if (distToCursor < FEED_RADIUS && this.stage !== "egg") {
-          this.nutrition += FEED_RATE * this.genes.voracidad * dt;
+        this.distToCursor = distToCursor;
+        this.isFeeding = distToCursor < FEED_RADIUS;
+
+        if (this.isFeeding) {
+          this.nutrition = min(this.nutrition + FEED_RATE * this.genes.voracidad * dt, 1);
+          this.growth = min(this.growth + (0.16 + this.nutrition * 0.34) * this.genes.voracidad * dt, 1);
+          this.starvingTime = max(0, this.starvingTime - dt * 1.1);
+        } else {
+          this.nutrition = max(0, this.nutrition - 0.12 * dt);
+          this.starvingTime += (0.18 + (1 - this.nutrition) * 0.95) * dt;
         }
 
-        // Stage progression
+        this.age += dt * (0.2 + (1 - this.nutrition) * 0.6 + (this.isFeeding ? 0.04 : 0.28));
+        this.refreshStage();
+
+        if (this.stage === "dead") return;
+
         const cfg = this.getStageConfig();
-        const stageDur = cfg.duration * (1 - min(this.nutrition * 0.1, 0.3)); // food speeds up growth slightly
-        if (this.stageTime >= stageDur) {
-          this.advanceStage();
-        }
-
-        // Movement
         const speedFactor = cfg.speed * this.genes.speedMul;
         if (speedFactor > 0) {
-          const selfMoveX = cos(t * kx + seed) * walkRadius.x * cfg.size;
-          const selfMoveY = sin(t * ky + seed) * walkRadius.y * cfg.size;
-          let fx = tx + selfMoveX;
-          let fy = ty + selfMoveY;
+          const gaitMul = 0.35 + speedFactor * 0.85;
+          const selfMoveX = cos(t * kx + seed) * walkRadius.x * gaitMul;
+          const selfMoveY = sin(t * ky + seed) * walkRadius.y * gaitMul;
+          const fx = tx + selfMoveX;
+          const fy = ty + selfMoveY;
 
-          const moveSpeed = followSpeed / speedFactor;
-          sx += (fx - sx) / max(moveSpeed, 5);
-          sy += (fy - sy) / max(moveSpeed, 5);
+          sx += (fx - sx) / followSpeed;
+          sy += (fy - sy) / followSpeed;
         }
 
-        // Render
-        const sizeMul = this.getSizeMul();
-        const r = (innerWidth / rnd(100, 150)) * sizeMul;
-
+        const hatchProgress = this.getHatchProgress();
+        const hatchEase = 1 - (1 - hatchProgress) ** 3;
+        const lifeGrowth = min(this.growth / ADULT_GROWTH, 1);
+        const visualMaturity = min(hatchEase * (0.2 + lifeGrowth * 0.8), 1);
+        const sizeMul = this.getSizeMul() * lerp(0.08, 1, hatchEase);
+        const r = bodyRadius * sizeMul;
         let i = 0;
-        const legLimit = this.stage === "baby" ? 4 : this.stage === "young" ? 6 : 8;
+        const baseLegLimit = cfg.legs;
+        const legLimit = min(baseLegLimit, max(2, Math.floor(2 + (baseLegLimit - 2) * visualMaturity)));
+        const searchRadius = lerp(innerWidth / 34, innerWidth / 10, visualMaturity);
+        const dotScale = max(0.16, sizeMul);
 
         pts.forEach((p, idx) => {
           const dx = p.x - sx;
           const dy = p.y - sy;
-          const len = hypot(dx, dy);
-          let cr = min(2, innerWidth / len / 5) * sizeMul;
-          const increasing = len < (innerWidth / 10) * sizeMul && i++ < legLimit;
-          let dir = increasing ? 0.1 : -0.1;
+          const len = hypot(dx, dy) || 1;
+          let cr = min(2, innerWidth / len / 5) * dotScale;
+          const increasing = len < searchRadius && i++ < legLimit;
+
           if (increasing) cr *= 1.5;
           p.r = cr;
-          p.len = max(0, min(p.len + dir, 1));
+          p.len = max(0, min(p.len + (increasing ? 0.1 : -0.1), 1));
 
-          // Sound
           if (increasing && !p._wasActive) {
-            const tex = this.getTexture();
-            AudioEngine.legClickLife(p.x, p.y, idx % 9, tex, sizeMul);
+            AudioEngine.legClickLife(p.x, p.y, idx % 9, this.getTexture(), sizeMul);
           }
           p._wasActive = increasing;
 
-          // Paint
           if (this.opacity < 1) ctx.globalAlpha = max(0, this.opacity);
-
           pts2.forEach((pt2) => {
             if (!p.len) return;
-            drawLine(ctx,
+            drawLine(
+              ctx,
               lerp(sx + pt2.x * r, p.x, p.len * p.len),
               lerp(sy + pt2.y * r, p.y, p.len * p.len),
               sx + pt2.x * r,
@@ -163,20 +268,8 @@ const LifeMode = (() => {
             );
           });
           drawCircle(ctx, p.x, p.y, p.r);
-
           if (this.opacity < 1) ctx.globalAlpha = 1;
         });
-      },
-
-      advanceStage() {
-        const idx = STAGE_ORDER.indexOf(this.stage);
-        if (idx < STAGE_ORDER.length - 1) {
-          this.stage = STAGE_ORDER[idx + 1];
-          this.stageTime = 0;
-          if (this.stage === "dead") {
-            AudioEngine.playDeath(sx, sy);
-          }
-        }
       },
 
       follow(fx, fy) {
@@ -188,44 +281,61 @@ const LifeMode = (() => {
 
   // ── Egg rendering ──
   function renderEgg(egg, t) {
-    const pulse = 0.8 + sin(t * 4) * 0.2; // Gentle pulsing
-    const r = 6 * pulse;
-    const progress = egg.age / egg.hatchDuration;
+    const pulse = 0.9 + sin(t * 4) * 0.1;
+    const progress = min(egg.age / egg.hatchDuration, 1);
+    const r = HOLD_EGG_RADIUS * pulse;
 
-    // Glow
     ctx.save();
-    ctx.globalAlpha = 0.3 + progress * 0.4;
-    ctx.fillStyle = `hsl(${280 + progress * 40}, 60%, ${50 + pulse * 20}%)`;
-    drawCircle(ctx, egg.x, egg.y, r * 2);
+    ctx.globalAlpha = 0.2 + progress * 0.35;
+    ctx.fillStyle = `hsl(${280 + progress * 20}, 55%, ${50 + progress * 10}%)`;
+    drawCircle(ctx, egg.x, egg.y, r * 1.7);
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.88;
+    drawCircle(ctx, egg.x, egg.y, r);
     ctx.restore();
 
-    // Core
-    ctx.fillStyle = "#fff";
-    drawCircle(ctx, egg.x, egg.y, r);
-
-    // Pulse sound
-    if (AudioEngine.isPlaying() && Math.random() < 0.005) {
+    if (AudioEngine.isPlaying() && Math.random() < 0.004) {
       AudioEngine.playEggPulse(egg.x, egg.y);
     }
   }
 
-  // ── Click to place egg ──
-  function onClick(e) {
-    if (!active) return;
-    const egg = createEgg(e.clientX, e.clientY);
-    entities.push(egg);
-    AudioEngine.playEggPlace(e.clientX, e.clientY);
-  }
+  function renderWeb(t, spidersNearCursor) {
+    if (webFade <= 0.01 || webAnchors.length < 3) return;
 
-  function onMove(e) {
-    if (!active) return;
-    mouseX = e.clientX;
-    mouseY = e.clientY;
-    entities.forEach(ent => {
-      if (ent.type === "spider" && ent.follow) {
-        ent.follow(e.clientX, e.clientY);
-      }
+    const ringSteps = [0.28, 0.48, 0.68, 0.88];
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * webFade})`;
+
+    webAnchors.forEach((anchor) => {
+      ctx.beginPath();
+      ctx.moveTo(webCenterX, webCenterY);
+      ctx.lineTo(anchor.x, anchor.y);
+      ctx.stroke();
     });
+
+    ringSteps.forEach((step, ringIndex) => {
+      ctx.beginPath();
+      webAnchors.forEach((anchor, idx) => {
+        const px = lerp(webCenterX, anchor.x, step);
+        const py = lerp(webCenterY, anchor.y, step);
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      const first = webAnchors[0];
+      ctx.lineTo(lerp(webCenterX, first.x, step), lerp(webCenterY, first.y, step));
+      ctx.globalAlpha = 0.55 + ringIndex * 0.08;
+      ctx.stroke();
+    });
+
+    ctx.globalAlpha = 0.35 + webFade * 0.35;
+    spidersNearCursor.forEach((spider) => {
+      ctx.beginPath();
+      ctx.moveTo(spider.x, spider.y);
+      ctx.lineTo(webCenterX, webCenterY);
+      ctx.stroke();
+    });
+    ctx.restore();
   }
 
   // ── Main tick ──
@@ -237,58 +347,162 @@ const LifeMode = (() => {
 
     canvasCtx.fillStyle = canvasCtx.strokeStyle = "#fff";
 
-    // Process entities
+    if (isHolding) {
+      const heldTime = t - holdStartTime;
+      const progress = min(heldTime / HOLD_DURATION, 1);
+      const r = lerp(2, HOLD_EGG_RADIUS, progress);
+
+      ctx.save();
+      ctx.globalAlpha = 0.15 + progress * 0.35;
+      ctx.fillStyle = `hsl(${280 - progress * 30}, 55%, ${42 + progress * 18}%)`;
+      drawCircle(ctx, holdX, holdY, r * 2);
+      ctx.fillStyle = "#fff";
+      ctx.globalAlpha = 0.55 + progress * 0.35;
+      drawCircle(ctx, holdX, holdY, r);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = `hsla(${280 - progress * 30}, 85%, 70%, ${0.25 + progress * 0.55})`;
+      ctx.beginPath();
+      ctx.arc(holdX, holdY, HOLD_EGG_RADIUS + 6, -PI / 2, -PI / 2 + PI * 2 * progress);
+      ctx.stroke();
+      ctx.restore();
+
+      if (AudioEngine.isPlaying() && t - lastHoldPulseAt >= 1.2) {
+        AudioEngine.playEggPulse(holdX, holdY);
+        lastHoldPulseAt = t;
+      }
+
+      if (progress >= 1) {
+        placeEgg(holdX, holdY);
+        cancelHold();
+      }
+    }
+
+    const aliveSpiders = entities.filter((ent) => ent.type === "spider" && ent.stage !== "dead");
+    const spidersNearCursor = aliveSpiders.filter((spider) => spider.distToCursor < FEED_RADIUS * 1.1);
+    const idleTime = t - lastCursorMoveAt;
+    const webTarget = idleTime >= WEB_IDLE_DELAY && spidersNearCursor.length > 0 ? 1 : 0;
+    webFade += (webTarget - webFade) * min(1, dt * 3.2);
+    if (webTarget && webAnchors.length === 0) {
+      createWebAt(mouseX, mouseY);
+    }
+    AudioEngine.setWebPresence(webFade);
+    renderWeb(t, spidersNearCursor);
+
     for (let i = entities.length - 1; i >= 0; i--) {
       const ent = entities[i];
 
       if (ent.type === "egg") {
-        ent.age += dt;
+        const hatchBoost = hypot(ent.x - mouseX, ent.y - mouseY) < FEED_RADIUS ? 2.4 : 1;
+        ent.age += dt * hatchBoost;
         renderEgg(ent, t);
 
-        // Hatch!
         if (ent.age >= ent.hatchDuration) {
           const spider = createSpider(ent.x, ent.y);
           spider.follow(mouseX, mouseY);
           entities[i] = spider;
           AudioEngine.playHatch(ent.x, ent.y);
         }
-      } else if (ent.type === "spider") {
-        if (ent.stage === "dead") {
-          ent.deathTimer += dt;
-          ent.opacity = max(0, 1 - ent.deathTimer / 2);
-          if (ent.deathTimer > 2) {
-            entities.splice(i, 1);
-            continue;
-          }
+        continue;
+      }
+
+      if (ent.stage === "dead") {
+        ent.deathTimer += dt;
+        ent.opacity = max(0, 1 - ent.deathTimer / 2);
+        if (ent.deathTimer > 2) {
+          entities.splice(i, 1);
+          continue;
         }
-        ent.tick(t, dt);
+      }
+
+      ent.tick(t, dt);
+    }
+  }
+
+  function onPointerDown(e) {
+    if (!active || !e.isPrimary || isUiEventTarget(e.target)) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
+
+    registerCursorMotion(e.clientX, e.clientY, true);
+    updateFollowers(e.clientX, e.clientY);
+    isHolding = true;
+    holdPointerId = e.pointerId;
+    holdStartTime = performance.now() / 1000;
+    holdX = e.clientX;
+    holdY = e.clientY;
+    lastHoldPulseAt = holdStartTime;
+  }
+
+  function onPointerMove(e) {
+    if (!active || !e.isPrimary) return;
+    if (isHolding && e.pointerId === holdPointerId) {
+      const dist = hypot(e.clientX - holdX, e.clientY - holdY);
+      if (dist > HOLD_MOVE_TOLERANCE) {
+        cancelHold(e.pointerId);
       }
     }
+
+    if (isUiEventTarget(e.target)) return;
+    if (e.cancelable) e.preventDefault();
+
+    registerCursorMotion(e.clientX, e.clientY);
+    updateFollowers(e.clientX, e.clientY);
+  }
+
+  function onPointerUp(e) {
+    cancelHold(e.pointerId);
+  }
+
+  function onPointerCancel(e) {
+    cancelHold(e.pointerId);
+  }
+
+  function onWindowBlur() {
+    cancelHold();
+  }
+
+  function onSpeedInput(e) {
+    followSpeed = parseInt(e.target.value, 10);
+    document.getElementById("followSpeedVal").textContent = followSpeed;
   }
 
   function start() {
     active = true;
     entities = [];
     lastT = 0;
-
-    // Hide ambient-only controls
+    followSpeed = parseInt(document.getElementById("followSpeed").value, 10);
+    mouseX = innerWidth / 2;
+    mouseY = innerHeight / 2;
+    lastCursorMoveAt = performance.now() / 1000;
+    lastCursorMoveX = mouseX;
+    lastCursorMoveY = mouseY;
+    webFade = 0;
+    createWebAt(mouseX, mouseY);
+    AudioEngine.setWebPresence(0);
+    cancelHold();
     document.querySelectorAll(".ambient-only").forEach(el => el.style.display = "none");
 
-    // Wire speed slider
-    document.getElementById("followSpeed").addEventListener("input", (e) => {
-      followSpeed = parseInt(e.target.value, 10);
-      document.getElementById("followSpeedVal").textContent = followSpeed;
-    });
+    document.getElementById("followSpeedVal").textContent = followSpeed;
+    document.getElementById("followSpeed").addEventListener("input", onSpeedInput);
 
-    addEventListener("pointerdown", onClick);
-    addEventListener("pointermove", onMove);
+    addEventListener("pointerdown", onPointerDown);
+    addEventListener("pointermove", onPointerMove);
+    addEventListener("pointerup", onPointerUp);
+    addEventListener("pointercancel", onPointerCancel);
+    addEventListener("blur", onWindowBlur);
   }
 
   function stop() {
     active = false;
     entities = [];
-    removeEventListener("pointerdown", onClick);
-    removeEventListener("pointermove", onMove);
+    document.getElementById("followSpeed").removeEventListener("input", onSpeedInput);
+    removeEventListener("pointerdown", onPointerDown);
+    removeEventListener("pointermove", onPointerMove);
+    removeEventListener("pointerup", onPointerUp);
+    removeEventListener("pointercancel", onPointerCancel);
+    removeEventListener("blur", onWindowBlur);
+    AudioEngine.setWebPresence(0);
+    cancelHold();
   }
 
   return { start, stop, tick, get active() { return active; } };

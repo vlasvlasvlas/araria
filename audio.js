@@ -10,6 +10,7 @@ const AudioEngine = (() => {
   let delayNode, feedbackGain, delayWet, delayFilter;
   let convolver, reverbGain;
   let droneOsc1, droneOsc2, droneSub, droneGain, droneOuterGain;
+  let webDroneGain, webDroneOuterGain, webDroneFilter;
   let noiseBuffer, clipper;
 
   // Params
@@ -17,6 +18,7 @@ const AudioEngine = (() => {
   let droneVol = 0;
   let ambienteLevel = 25;
   let spiderTexture = 75;
+  let webPresence = 0;
 
   function init() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -137,6 +139,61 @@ const AudioEngine = (() => {
     droneSub.connect(sg);
     sg.connect(droneGain);
     droneSub.start();
+
+    // ═══ Web Drone (warm, calm pad) ═══
+    webDroneGain = audioCtx.createGain();
+    webDroneGain.gain.value = 0.12;
+    webDroneOuterGain = audioCtx.createGain();
+    webDroneOuterGain.gain.value = 0;
+    webDroneFilter = audioCtx.createBiquadFilter();
+    webDroneFilter.type = "lowpass";
+    webDroneFilter.frequency.value = 950;
+    webDroneGain.connect(webDroneFilter);
+    webDroneFilter.connect(webDroneOuterGain);
+    webDroneOuterGain.connect(dryGain);
+    webDroneOuterGain.connect(convolver);
+
+    const webOsc1 = audioCtx.createOscillator();
+    webOsc1.type = "triangle";
+    webOsc1.frequency.value = 196; // G3
+    webOsc1.connect(webDroneGain);
+    webOsc1.start();
+
+    const webOsc2 = audioCtx.createOscillator();
+    webOsc2.type = "sine";
+    webOsc2.frequency.value = 246.94; // B3
+    webOsc2.connect(webDroneGain);
+    webOsc2.start();
+
+    const webOsc3 = audioCtx.createOscillator();
+    webOsc3.type = "sine";
+    webOsc3.frequency.value = 293.66; // D4
+    webOsc3.connect(webDroneGain);
+    webOsc3.start();
+
+    const webOsc4 = audioCtx.createOscillator();
+    webOsc4.type = "sine";
+    webOsc4.frequency.value = 392; // G4
+    webOsc4.connect(webDroneGain);
+    webOsc4.start();
+
+    const webLfo1 = audioCtx.createOscillator();
+    webLfo1.type = "sine";
+    webLfo1.frequency.value = 0.08;
+    const webLfo1Gain = audioCtx.createGain();
+    webLfo1Gain.gain.value = 0.035;
+    webLfo1.connect(webLfo1Gain);
+    webLfo1Gain.connect(webDroneGain.gain);
+    webLfo1.start();
+
+    const webLfo2 = audioCtx.createOscillator();
+    webLfo2.type = "sine";
+    webLfo2.frequency.value = 0.11;
+    const webLfo2Gain = audioCtx.createGain();
+    webLfo2Gain.gain.value = 260;
+    webLfo2.connect(webLfo2Gain);
+    webLfo2Gain.connect(webDroneFilter.frequency);
+    webLfo2.start();
 
     started = true;
     applyAmbiente();
@@ -276,50 +333,47 @@ const AudioEngine = (() => {
     src.stop(now + total);
   }
 
-  // ═══ Egg placement (warm, high, powerful chime) ═══
+  // ═══ Egg placement (warm, low, powerful pulse) ═══
   function playEggPlace(x, y) {
     if (!started) return;
     const now = audioCtx.currentTime;
 
-    // Main tone — warm sine sweep
+    // Main tone — lower and warmer
     const osc1 = audioCtx.createOscillator();
     osc1.type = "sine";
-    osc1.frequency.setValueAtTime(800, now);
-    osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
-    osc1.frequency.exponentialRampToValueAtTime(900, now + 0.4);
+    osc1.frequency.setValueAtTime(200, now);
+    osc1.frequency.exponentialRampToValueAtTime(450, now + 0.15);
+    osc1.frequency.exponentialRampToValueAtTime(300, now + 0.5);
 
-    // Harmonic — adds warmth
+    // Warm harmonic
     const osc2 = audioCtx.createOscillator();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(1600, now);
-    osc2.frequency.exponentialRampToValueAtTime(2400, now + 0.1);
-    osc2.frequency.exponentialRampToValueAtTime(1800, now + 0.35);
+    osc2.type = "triangle"; // softer harmonic
+    osc2.frequency.setValueAtTime(100, now);
+    osc2.frequency.exponentialRampToValueAtTime(220, now + 0.2);
 
     const env = audioCtx.createGain();
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(0.25, now + 0.02);
-    env.gain.linearRampToValueAtTime(0.15, now + 0.15);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    env.gain.linearRampToValueAtTime(0.4, now + 0.05); // more powerful start
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
 
-    const env2 = audioCtx.createGain();
-    env2.gain.setValueAtTime(0, now);
-    env2.gain.linearRampToValueAtTime(0.08, now + 0.02);
-    env2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 600;
 
     const pan = audioCtx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
 
     osc1.connect(env);
-    osc2.connect(env2);
-    env.connect(pan);
-    env2.connect(pan);
+    osc2.connect(env);
+    env.connect(filter);
+    filter.connect(pan);
     pan.connect(clipper);
     pan.connect(convolver);
 
     osc1.start(now);
-    osc1.stop(now + 0.55);
+    osc1.stop(now + 0.85);
     osc2.start(now);
-    osc2.stop(now + 0.35);
+    osc2.stop(now + 0.85);
   }
 
   // ═══ Egg pulse (heartbeat) ═══
@@ -346,33 +400,49 @@ const AudioEngine = (() => {
     osc.stop(now + 0.25);
   }
 
-  // ═══ Hatch sound (crack/pop) ═══
+  // ═══ Hatch sound (mouth-like plop, no tail) ═══
   function playHatch(x, y) {
     if (!started) return;
     const now = audioCtx.currentTime;
-    const src = audioCtx.createBufferSource();
-    src.buffer = noiseBuffer;
-
-    const bp = audioCtx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 3000 + Math.random() * 2000;
-    bp.Q.value = 3;
-
-    const env = audioCtx.createGain();
-    env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(0.5, now + 0.002);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-
     const pan = audioCtx.createStereoPanner();
     pan.pan.value = Math.max(-1, Math.min(1, (x / innerWidth) * 2 - 1));
 
-    src.connect(bp);
-    bp.connect(env);
-    env.connect(pan);
+    const popOsc = audioCtx.createOscillator();
+    popOsc.type = "sine";
+    popOsc.frequency.setValueAtTime(190, now);
+    popOsc.frequency.exponentialRampToValueAtTime(110, now + 0.032);
+
+    const popEnv = audioCtx.createGain();
+    popEnv.gain.setValueAtTime(0, now);
+    popEnv.gain.linearRampToValueAtTime(0.24, now + 0.002);
+    popEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.042);
+
+    const shellSrc = audioCtx.createBufferSource();
+    shellSrc.buffer = noiseBuffer;
+
+    const shellBp = audioCtx.createBiquadFilter();
+    shellBp.type = "bandpass";
+    shellBp.frequency.value = 1400 + Math.random() * 250;
+    shellBp.Q.value = 2.2;
+
+    const shellEnv = audioCtx.createGain();
+    shellEnv.gain.setValueAtTime(0, now);
+    shellEnv.gain.linearRampToValueAtTime(0.05, now + 0.001);
+    shellEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
+    popOsc.connect(popEnv);
+    popEnv.connect(pan);
+
+    shellSrc.connect(shellBp);
+    shellBp.connect(shellEnv);
+    shellEnv.connect(pan);
+
     pan.connect(clipper);
-    pan.connect(convolver);
-    src.start(now, Math.random() * 0.5, 0.08);
-    src.stop(now + 0.08);
+
+    popOsc.start(now);
+    popOsc.stop(now + 0.05);
+    shellSrc.start(now, Math.random() * 0.4, 0.022);
+    shellSrc.stop(now + 0.022);
   }
 
   // ═══ Ambiente control ═══
@@ -384,6 +454,9 @@ const AudioEngine = (() => {
     feedbackGain.gain.linearRampToValueAtTime(a * 0.75, now + 0.2);
     delayWet.gain.linearRampToValueAtTime(a * 0.6, now + 0.2);
     delayNode.delayTime.linearRampToValueAtTime(0.2 + a * 0.3, now + 0.3);
+    if (webDroneFilter) {
+      webDroneFilter.frequency.linearRampToValueAtTime(760 + a * 900 + webPresence * 260, now + 0.3);
+    }
   }
 
   // ═══ Frame tick — update drone ═══
@@ -391,6 +464,11 @@ const AudioEngine = (() => {
     if (!started) return;
     const now = audioCtx.currentTime;
     droneOuterGain.gain.linearRampToValueAtTime(droneVol / 100, now + 0.3);
+    if (webDroneOuterGain) {
+      const webLevel = (droneVol / 100) * webPresence * 0.85;
+      webDroneOuterGain.gain.linearRampToValueAtTime(webLevel, now + 0.45);
+      webDroneGain.gain.linearRampToValueAtTime(0.08 + webPresence * 0.08, now + 0.45);
+    }
   }
 
   // ═══ Death sound (low fade crack) ═══
@@ -429,16 +507,27 @@ const AudioEngine = (() => {
   function setDroneVol(v) { droneVol = v; }
   function setAmbiente(v) { ambienteLevel = v; applyAmbiente(); }
   function setSpiderTexture(v) { spiderTexture = v; }
+  function setWebPresence(v) {
+    webPresence = Math.max(0, Math.min(1, v));
+    applyAmbiente();
+  }
 
   async function toggle() {
-    if (!audioCtx) init();
-    if (audioCtx.state === "suspended") {
+    if (!audioCtx) {
+      init();
+      if (audioCtx.state !== "running") {
+        await audioCtx.resume();
+      }
+      return true;
+    }
+
+    if (audioCtx.state !== "running") {
       await audioCtx.resume();
       return true;
-    } else {
-      await audioCtx.suspend();
-      return false;
     }
+
+    await audioCtx.suspend();
+    return false;
   }
 
   function isPlaying() {
@@ -449,6 +538,6 @@ const AudioEngine = (() => {
     toggle, isPlaying, tick,
     legClick, legClickLife,
     playEggPlace, playEggPulse, playHatch, playDeath,
-    setInsectVol, setDroneVol, setAmbiente, setSpiderTexture
+    setInsectVol, setDroneVol, setAmbiente, setSpiderTexture, setWebPresence
   };
 })();
