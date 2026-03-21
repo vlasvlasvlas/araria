@@ -15,7 +15,7 @@ Modo libre donde varias aranas siguen el cursor o el toque.
 
 Modo de ciclo de vida con huevos, nacimiento, crecimiento y muerte.
 
-- Mantener presionado `2 segundos` crea un huevo.
+- Mantener presionado `1,5 segundos` crea un huevo.
 - Si se mueve el mouse o el dedo durante el hold, la creacion se cancela.
 - El huevo eclosiona mas rapido cerca del cursor.
 - La arana nace muy chica, empieza con pocas patas y crece mientras se alimenta cerca del cursor.

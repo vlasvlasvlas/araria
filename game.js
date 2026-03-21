@@ -16,6 +16,24 @@
   let loopStarted = false;
   let modeSelectHideTimer = null;
 
+  function clearBrowserSelection() {
+    const selection = window.getSelection?.();
+    if (selection && selection.rangeCount > 0) {
+      selection.removeAllRanges();
+    }
+  }
+
+  function shouldSuppressBrowserHold(target) {
+    if (!currentMode) return false;
+    return !(target instanceof HTMLInputElement);
+  }
+
+  function suppressBrowserHold(e) {
+    if (!shouldSuppressBrowserHold(e.target)) return;
+    e.preventDefault();
+    clearBrowserSelection();
+  }
+
   // ── Shared audio controls ──
   function wireAudioControls() {
     if (controlsWired) return;
@@ -84,6 +102,12 @@
       returnToMenu();
     }
   });
+
+  document.addEventListener("contextmenu", suppressBrowserHold);
+  document.addEventListener("selectstart", suppressBrowserHold);
+  document.addEventListener("dragstart", suppressBrowserHold);
+  document.addEventListener("touchend", clearBrowserSelection, { passive: true });
+  window.addEventListener("blur", clearBrowserSelection);
 
   function stopCurrentMode() {
     if (currentMode === "ambient") {

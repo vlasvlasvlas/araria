@@ -18,7 +18,7 @@ const LifeMode = (() => {
   let holdX = 0;
   let holdY = 0;
   let lastHoldPulseAt = 0;
-  const HOLD_DURATION = 2;
+  const HOLD_DURATION = 1.5;
   const HOLD_MOVE_TOLERANCE = 18;
   const HOLD_EGG_RADIUS = 12;
   const YOUNG_GROWTH = 0.26;
